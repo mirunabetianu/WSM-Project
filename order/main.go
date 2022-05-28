@@ -19,7 +19,7 @@ func main() {
 		if connectionOpen == "connection open" {
 			c.SendString("Created order for the given user " + c.Params("user_id"))
 		} else {
-			c.SendString("Failed to to create order for the given user " + c.Params("user_id"))
+			c.SendString("Failed to create order for the given user " + c.Params("user_id"))
 		}
 	})
 

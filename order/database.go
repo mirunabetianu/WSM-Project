@@ -25,8 +25,13 @@ func openPsqlConnection() string {
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		return "connection open"
+		return "connection failed"
 	}
 	defer db.Close()
-	return "connection failed"
+
+	err = db.Ping()
+	if err != nil {
+		return "connection failed"
+	}
+	return "connection open"
 }
