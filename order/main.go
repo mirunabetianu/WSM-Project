@@ -3,26 +3,11 @@ package main
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
+	databaseUtils "order/database"
+	"strconv"
 )
 
-type Order struct {
-	gorm.Model
-	Paid      bool   `gorm:"type:bool;default:false"`
-	UserId    string `gorm:"type:varchar;not null"`
-	TotalCost int    `gorm:"type:bigint;default:0"`
-	Items     []Item `gorm:"many2many:order_item;"`
-}
-
-// Item TODO
-type Item struct {
-	gorm.Model
-	Stock  int     `gorm:"type:bigint;default:0"`
-	Price  int     `gorm:"type:bigint;default:0"`
-	Orders []Order `gorm:"many2many:order_item;"`
-}
-
-var database = openPsqlConnection()
+var database = databaseUtils.OpenPsqlConnection()
 
 func main() {
 	// Fiber instance
@@ -35,7 +20,11 @@ func main() {
 
 	// Routes
 	app.Get("/", hello)
+
+	// Get all orders
 	app.Get("/orders/getAll", getOrders)
+
+	// Get order by order_id
 	app.Get("/orders/find/:order_id", findOrder)
 
 	// Endpoint: /orders/create/{user_id}
@@ -43,12 +32,16 @@ func main() {
 	// Output JSON fields: “order_id”  - the order’s id
 	app.Post("/orders/create/:user_id", createOrder)
 
+	// Remove order by order_id
 	app.Delete("/orders/remove/:order_id", removeOrder)
 
+	// Add item to order
 	app.Post("/orders/addItem/:order_id/:item_id", addItemToOrder)
 
-	app.Delete("/orders/addItem/:order_id/:item_id", removeItemFromOrder)
+	// Remove item from order
+	app.Delete("/orders/removeItem/:order_id/:item_id", removeItemFromOrder)
 
+	// Checkout order
 	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
@@ -64,7 +57,7 @@ func hello(c *fiber.Ctx) error {
 }
 
 func getOrders(c *fiber.Ctx) error {
-	var orders []Order
+	var orders []databaseUtils.Order
 
 	result := database.Find(&orders)
 
@@ -76,7 +69,7 @@ func getOrders(c *fiber.Ctx) error {
 }
 
 func createOrder(c *fiber.Ctx) error {
-	order := Order{UserId: c.Params("user_id")}
+	order := databaseUtils.Order{UserId: c.Params("user_id")}
 
 	result := database.Create(&order)
 
@@ -90,7 +83,7 @@ func createOrder(c *fiber.Ctx) error {
 
 func removeOrder(c *fiber.Ctx) error {
 	id := c.Params("order_id")
-	var order Order
+	var order databaseUtils.Order
 
 	result := database.Delete(&order, id)
 
@@ -103,7 +96,7 @@ func removeOrder(c *fiber.Ctx) error {
 
 func findOrder(c *fiber.Ctx) error {
 	id := c.Params("order_id")
-	var order Order
+	var order databaseUtils.Order
 
 	result := database.Find(&order, id)
 
@@ -114,14 +107,73 @@ func findOrder(c *fiber.Ctx) error {
 	return c.Status(200).JSON(&order)
 }
 
-//TODO
 func addItemToOrder(c *fiber.Ctx) error {
-	return c.SendStatus(500)
+	orderId := c.Params("order_id")
+	itemId := c.Params("item_id")
+
+	var order databaseUtils.Order
+
+	result := database.Find(&order, orderId)
+
+	if result.RowsAffected == 1 {
+		item, errConversion := strconv.Atoi(itemId)
+
+		if errConversion != nil {
+			return c.SendStatus(400)
+		}
+		result2 := database.Find(&order, orderId).Update("Items", append(order.Items, int64(item)))
+
+		if result2.RowsAffected == 0 {
+			return c.SendStatus(400)
+		} else {
+			return c.SendStatus(200)
+		}
+	} else {
+		return c.SendStatus(400)
+	}
 }
 
-//TODO
 func removeItemFromOrder(c *fiber.Ctx) error {
-	return c.SendStatus(500)
+	orderId := c.Params("order_id")
+	itemId := c.Params("item_id")
+
+	var order databaseUtils.Order
+
+	result := database.Find(&order, orderId)
+
+	if order.Items == nil {
+		return c.SendStatus(400)
+	}
+	if result.RowsAffected == 1 {
+		item, errConversion := strconv.Atoi(itemId)
+
+		if errConversion != nil {
+			return c.SendStatus(400)
+		}
+
+		var exist bool
+		exist = false
+
+		for i, s := range order.Items {
+			if s == int64(item) {
+				order.Items[i] = order.Items[len(order.Items)-1]
+				exist = true
+			}
+		}
+		if !exist {
+			return c.SendStatus(400)
+		}
+
+		result2 := database.Find(&order, orderId).Update("Items", order.Items[:len(order.Items)-1])
+
+		if result2.RowsAffected == 0 {
+			return c.SendStatus(400)
+		} else {
+			return c.SendStatus(200)
+		}
+	} else {
+		return c.SendStatus(400)
+	}
 }
 
 //TODO: needs additional endpoints to be implemented
