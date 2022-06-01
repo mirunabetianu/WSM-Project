@@ -1,15 +1,14 @@
 package main
 
 import (
-	"database/sql"
-	_ "database/sql"
 	"fmt"
 	_ "fmt"
-
 	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-// Please change this constants according to your setup
+// Please change this constant according to your setup
 const (
 	host     = "localhost"
 	port     = 5432
@@ -18,20 +17,15 @@ const (
 	dbname   = "postgres"
 )
 
-func openPsqlConnection() string {
+func openPsqlConnection() *gorm.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		return "connection failed"
+	db, errDb := gorm.Open(postgres.Open(psqlInfo), &gorm.Config{})
+	errMg := db.AutoMigrate(&Order{}, &Item{})
+	if errDb != nil && errMg != nil {
+		return nil
 	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		return "connection failed"
-	}
-	return "connection open"
+	return db
 }
