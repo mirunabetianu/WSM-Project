@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
@@ -17,5 +17,5 @@ func main() {
 	app.Get("/payment/status/:user_id/:order_id", paymentStatus)
 
 	// start server
-	app.Listen(3000)
+	app.Listen(":3001")
 }

@@ -1,19 +1,27 @@
 package main
 
 import (
+	"fmt"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 // Please change this constants according to your setup
+const (
+	host     = "localhost"
+	port     = 5433
+	user     = "postgres"
+	password = "251219"
+	dbname   = "postgres"
+)
 
-var dsn = "host=localhost user=postgres password=251219 dbname=postgres port=5433"
-
+var databaseInfo = fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 var Database *gorm.DB
 
 func connect() (error, *gorm.DB) {
 	var err error
-	Database, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	Database, err = gorm.Open(postgres.Open(databaseInfo), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect to database")
 	}

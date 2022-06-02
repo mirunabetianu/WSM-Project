@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type Payment struct {
 	OrderID uint
 }
 
-func findUser(c *fiber.Ctx) {
+func findUser(c *fiber.Ctx) error {
 	type Item struct {
 		ID     uint `json:"user_id"`
 		Credit uint `json:"credit"`
@@ -28,26 +28,26 @@ func findUser(c *fiber.Ctx) {
 	var user User
 	result := Database.First(&user, user_id)
 	if result.Error != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
+
 	}
-	c.Status(200).JSON(Item{user.ID, user.Credit})
+	return c.Status(200).JSON(Item{user.ID, user.Credit})
 }
 
-func createUser(c *fiber.Ctx) {
+func createUser(c *fiber.Ctx) error {
 	type Item struct {
 		User_id uint `json:"user_id"`
 	}
 	user := &User{Credit: 0}
 	result := Database.Create(user)
 	if result.Error != nil {
-		c.Status(400)
+		return c.SendStatus(400)
 
 	}
-	c.Status(200).JSON(Item{user.ID})
+	return c.Status(200).JSON(Item{user.ID})
 }
 
-func addFunds(c *fiber.Ctx) {
+func addFunds(c *fiber.Ctx) error {
 	type Item struct {
 		Done bool `json:"done"`
 	}
@@ -59,60 +59,53 @@ func addFunds(c *fiber.Ctx) {
 	amount = uint(amount_temp)
 
 	if err != nil {
-		c.Status(400).JSON(Item{false})
+		return c.Status(400).JSON(Item{false})
 	}
 
 	var user User
 	result := Database.First(&user, user_id)
 	fmt.Printf("result: %v, rows affected %v\n", result.Error, result.RowsAffected)
 	if result.Error != nil {
-		c.Status(400).JSON(Item{false})
-		return
+		return c.Status(400).JSON(Item{false})
 	}
 	user.Credit = user.Credit + amount
 	save_result := Database.Save(&user)
 	fmt.Printf("result: %v, rows affected %v\n", save_result.Error, save_result.RowsAffected)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
-		c.Status(400).JSON(Item{false})
-		return
+		return c.Status(400).JSON(Item{false})
 	}
-	c.Status(200).JSON(Item{true})
+	return c.Status(200).JSON(Item{true})
 }
 
-func pay(c *fiber.Ctx) {
+func pay(c *fiber.Ctx) error {
 
 	user_id := c.Params("user_id")
 	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
 	if err != nil {
-		c.Status(400)
-		return
+		c.SendStatus(400)
 	}
 	order_id := uint(temp_orderid)
 
 	temp_amount, err := strconv.ParseUint(c.Params("amount"), 10, 64)
 	if err != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 	amount := uint(temp_amount)
 
 	var user User
 	result := Database.First(&user, user_id)
 	if result.Error != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 
 	if user.Credit < amount {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 
 	user.Credit = user.Credit - amount
 	save_result := Database.Save(&user)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 
 	var payment Payment
@@ -120,75 +113,76 @@ func pay(c *fiber.Ctx) {
 	fmt.Printf("payment: %v\n", payment)
 	fmt.Printf("error: %v\n", exists)
 	if exists == nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 
 	payment = Payment{Status: 0, OrderID: order_id}
 
 	result_payment := Database.Create(&payment)
 	if result_payment.Error != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
-
-	c.Status(200)
+	return c.SendStatus(200)
 }
 
-//TODO: cancel payment and payment status. needs access to order service
-func paymentCancel(c *fiber.Ctx) {
+func paymentCancel(c *fiber.Ctx) error {
 
 	//user_id := c.Params("user_id")
 
 	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
 	if err != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 	order_id := uint(temp_orderid)
 
 	var payment Payment
 	result := Database.Where(Payment{OrderID: order_id}).First(&payment)
 	if result.Error != nil {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
 
 	payment.Status = 1
 	save_result := Database.Save(&payment)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
-		c.Status(400)
-		return
+		return c.SendStatus(400)
 	}
-	c.Status(200)
+	return c.SendStatus(200)
 }
-func paymentStatus(c *fiber.Ctx) {
+
+func paymentStatus(c *fiber.Ctx) error {
 	//user_id := c.Params("user_id")
 
-	type Item struct {
-		Paied bool `json:"paid"`
+	//cals the order service /order/find endpoint and returns just the "paid" status (user id not used)
+	//this will need to be modified once we implement event based communication
+	type Order struct {
+		Paid bool `json:"done"`
 	}
+	order := new(Order)
+	call("3000", "/orders/find/1/", order)
+	return c.Status(200).JSON(order)
 
-	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
-	if err != nil {
-		c.Status(400)
-		return
-	}
-	order_id := uint(temp_orderid)
+	//this logic is in case the payment status is kept in a different table in the payment database.
 
-	var payment Payment
-	result := Database.Where(Payment{OrderID: order_id}).First(&payment)
-	if result.Error != nil {
-		c.Status(400)
-		return
-	}
-	var paid bool
-	if payment.Status == 0 {
-		paid = true
-	} else {
-		paid = false
-	}
+	// type Item struct {
+	// 	Paied bool `json:"paid"`
+	// }
+	// temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
+	// if err != nil {
+	// 	return c.SendStatus(400)
+	// }
+	// order_id := uint(temp_orderid)
+	// var payment Payment
+	// result := Database.Where(Payment{OrderID: order_id}).First(&payment)
+	// if result.Error != nil {
+	// 	return c.SendStatus(400)
+	// }
+	// var paid bool
+	// if payment.Status == 0 {
+	// 	paid = true
+	// } else {
+	// 	paid = false
+	// }
 
-	c.Status(200).JSON(Item{paid})
+	// return c.Status(200).JSON(Item{paid})
 
 }

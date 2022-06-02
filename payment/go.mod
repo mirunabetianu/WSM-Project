@@ -2,7 +2,11 @@ module payment
 
 go 1.18
 
-require github.com/gofiber/fiber v1.14.6
+require (
+	github.com/gofiber/fiber/v2 v2.34.0
+	gorm.io/driver/postgres v1.3.7
+	gorm.io/gorm v1.23.5
+)
 
 require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
@@ -29,7 +33,5 @@ require (
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	gorm.io/driver/postgres v1.3.7 // indirect
 	gorm.io/driver/sqlite v1.3.2 // indirect
-	gorm.io/gorm v1.23.5 // indirect
 )
