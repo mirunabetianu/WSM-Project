@@ -17,5 +17,5 @@ func main() {
 	app.Get("/payment/status/:user_id/:order_id", paymentStatus)
 
 	// start server
-	app.Listen(":3001")
+	app.Listen(":3002")
 }

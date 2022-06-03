@@ -152,8 +152,6 @@ func paymentCancel(c *fiber.Ctx) error {
 func paymentStatus(c *fiber.Ctx) error {
 	//user_id := c.Params("user_id")
 
-	//cals the order service /order/find endpoint and returns just the "paid" status (user id not used)
-	//this will need to be modified once we implement event based communication
 	type Order struct {
 		Paid bool `json:"done"`
 	}
