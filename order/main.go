@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	databaseUtils "order/database"
+	utils "order/utils"
 	"strconv"
 )
 
-var database = databaseUtils.OpenPsqlConnection()
+var mqtt = utils.OpenMqttConnection()
+var database = utils.OpenPsqlConnection()
 
 func main() {
 	// Fiber instance
@@ -21,15 +22,15 @@ func main() {
 	// Routes
 	app.Get("/", hello)
 
+	utils.Subscribe(mqtt, "topic/wdm")
+	utils.Publish(mqtt, "topic/wdm")
 	// Get all orders
 	app.Get("/orders/getAll", getOrders)
 
 	// Get order by order_id
 	app.Get("/orders/find/:order_id", findOrder)
 
-	// Endpoint: /orders/create/{user_id}
-	// Method POST - creates an order for the given user, and returns an order_id
-	// Output JSON fields: “order_id”  - the order’s id
+	// Create order for user_id
 	app.Post("/orders/create/:user_id", createOrder)
 
 	// Remove order by order_id
@@ -57,7 +58,7 @@ func hello(c *fiber.Ctx) error {
 }
 
 func getOrders(c *fiber.Ctx) error {
-	var orders []databaseUtils.Order
+	var orders []utils.Order
 
 	result := database.Find(&orders)
 
@@ -69,7 +70,7 @@ func getOrders(c *fiber.Ctx) error {
 }
 
 func createOrder(c *fiber.Ctx) error {
-	order := databaseUtils.Order{UserId: c.Params("user_id")}
+	order := utils.Order{UserId: c.Params("user_id")}
 
 	result := database.Create(&order)
 
@@ -83,7 +84,7 @@ func createOrder(c *fiber.Ctx) error {
 
 func removeOrder(c *fiber.Ctx) error {
 	id := c.Params("order_id")
-	var order databaseUtils.Order
+	var order utils.Order
 
 	result := database.Delete(&order, id)
 
@@ -96,7 +97,7 @@ func removeOrder(c *fiber.Ctx) error {
 
 func findOrder(c *fiber.Ctx) error {
 	id := c.Params("order_id")
-	var order databaseUtils.Order
+	var order utils.Order
 
 	result := database.Find(&order, id)
 
@@ -111,7 +112,7 @@ func addItemToOrder(c *fiber.Ctx) error {
 	orderId := c.Params("order_id")
 	itemId := c.Params("item_id")
 
-	var order databaseUtils.Order
+	var order utils.Order
 
 	result := database.Find(&order, orderId)
 
@@ -137,7 +138,7 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 	orderId := c.Params("order_id")
 	itemId := c.Params("item_id")
 
-	var order databaseUtils.Order
+	var order utils.Order
 
 	result := database.Find(&order, orderId)
 
