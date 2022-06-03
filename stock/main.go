@@ -3,21 +3,25 @@ package main
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	databaseUtils "stock/database"
+	utils "stock/utils"
 	"strconv"
 )
 
-var database = databaseUtils.OpenPsqlConnection()
+var database = utils.OpenPsqlConnection()
+var mqtt = utils.OpenMqttConnection()
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
 
-	// Check database not null
-	if database == nil {
-		fmt.Printf("", database)
+	// Check utils not null
+	if database == nil || mqtt == nil {
+		fmt.Println("Error initializing db and mqtt")
 		return
 	}
+
+	utils.Subscribe(mqtt, "topic/wdm")
+	utils.Publish(mqtt, "topic/wdm")
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.SendString("hello")
@@ -48,7 +52,7 @@ func createItem(ctx *fiber.Ctx) error {
 		ctx.Status(404)
 	}
 
-	item := databaseUtils.Item{Price: uint(price)}
+	item := utils.Item{Price: uint(price)}
 
 	result := database.Create(&item)
 
@@ -62,7 +66,7 @@ func createItem(ctx *fiber.Ctx) error {
 
 func getItem(ctx *fiber.Ctx) error {
 	item_id := ctx.Params("item_id")
-	var item databaseUtils.Item
+	var item utils.Item
 
 	result := database.Find(&item, item_id)
 
@@ -81,7 +85,7 @@ func subtractStockFromItem(ctx *fiber.Ctx) error {
 		ctx.Status(404)
 	}
 
-	var item databaseUtils.Item
+	var item utils.Item
 
 	result := database.Find(&item, item_id)
 
@@ -106,7 +110,7 @@ func addStockToItem(ctx *fiber.Ctx) error {
 		ctx.Status(404)
 	}
 
-	var item databaseUtils.Item
+	var item utils.Item
 
 	result := database.Find(&item, item_id).Update("Stock", item.Stock+uint(amount))
 
