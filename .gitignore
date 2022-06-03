@@ -5,3 +5,5 @@
 *.out
 
 go.work
+
+pkg/
