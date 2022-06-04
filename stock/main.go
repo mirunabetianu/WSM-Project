@@ -8,20 +8,21 @@ import (
 )
 
 var database = utils.OpenPsqlConnection()
-var mqtt = utils.OpenMqttConnection()
+
+//var mqtt = utils.OpenMqttConnection()
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
 
 	// Check utils not null
-	if database == nil || mqtt == nil {
+	if database == nil {
 		fmt.Println("Error initializing db and mqtt")
 		return
 	}
 
-	utils.Subscribe(mqtt, "topic/wdm")
-	utils.Publish(mqtt, "topic/wdm")
+	//utils.Subscribe(mqtt, "topic/addItem")
+	//utils.Subscribe(mqtt, "topic/removeItem")
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.SendString("hello")

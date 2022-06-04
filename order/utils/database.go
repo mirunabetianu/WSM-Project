@@ -14,8 +14,8 @@ const (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
-	password = "root"
-	dbname   = "postgres"
+	password = "Miruna999"
+	dbname   = "wsm"
 )
 
 type Order struct {
@@ -24,6 +24,12 @@ type Order struct {
 	UserId    string        `gorm:"type:varchar;not null"`
 	TotalCost int           `gorm:"type:bigint;default:0"`
 	Items     pq.Int64Array `gorm:"type:integer[]"`
+}
+
+type Item struct {
+	gorm.Model
+	Stock uint `json:"stock"`
+	Price uint `json:"price"`
 }
 
 func OpenPsqlConnection() *gorm.DB {
