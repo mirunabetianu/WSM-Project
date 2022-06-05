@@ -24,6 +24,11 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 
+	if database == nil {
+		fmt.Printf("", database)
+		return
+	}
+
 	// Routes
 	app.Get("/", hello)
 
@@ -53,7 +58,10 @@ func main() {
 	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
-	app.Listen(3000)
+	err := app.Listen(":3000")
+	if err != nil {
+		return
+	}
 }
 
 // Handlers
@@ -227,7 +235,10 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 	}
 }
 
-//TODO: needs additional endpoints to be implemented
+//TODO
+// Note: currently we make the subtract call of the stock service for each item we have,
+// this might be the bottleneck of the application if we checkout a lot of items,
+// I am making the assumption that most orders have few items
 func checkout(c *fiber.Ctx) error {
 	orderId := c.Params("order_id")
 
@@ -239,37 +250,84 @@ func checkout(c *fiber.Ctx) error {
 		return c.SendStatus(400)
 	}
 	if result.RowsAffected == 1 {
+		//emptyPostBody, _ := json.Marshal(map[string]string{})
+
 		// payment to  /payment/pay/{user_id}/{order_id}/{amount}
-		requestURL := fmt.Sprintf("http://%s:%d/payment/pay/%d/%d/%d",
+		paymentRequestUrl := fmt.Sprintf("http://%s:%d/payment/pay/%s/%s/%d",
 			paymentServiceHost,
 			paymentServicePort,
 			order.UserId,
 			orderId,
 			order.TotalCost)
 
-		resPaymentService, err := http.Get(requestURL)
+		fmt.Println(paymentRequestUrl)
+
+		resPaymentService, err := http.Post(paymentRequestUrl, "application/json", nil)
+
 		if err != nil {
 			fmt.Printf("error making http request: %s\n", err)
-			os.Exit(1)
 		}
 
-		if resPaymentService.Status == "200" {
-			// subtract from /payment/pay/{user_id}/{order_id}/{amount}
-			requestURL := fmt.Sprintf("http://%s:%d/stock/subtract/%d/", stockServiceHost, stockServicePort, order.TotalCost)
-			res, err := http.Get(requestURL)
-			if err != nil {
-				fmt.Printf("error making http request: %s\n", err)
-				os.Exit(1)
-			}
-			if res.Status == "400" {
-				return c.SendStatus(400)
+		// keep a list of the item_id for which subtract stock call was successful
+		// in case we need to rollback the transaction we need to add the stock again
+		var processedItems []int64
+
+		fmt.Println(resPaymentService)
+		fmt.Println(resPaymentService.Status)
+		fmt.Println(resPaymentService.StatusCode)
+
+		// Subtract stock of all the items via stock service
+		if resPaymentService.StatusCode == 200 {
+			fmt.Println(order.Items)
+			// iterate through all the items of the current order
+			for i, s := range order.Items {
+				fmt.Println(i, s)
+				// TODO we simply subtract 1 for each item id, if we have item_id 5 times, we subtract 1 5 times instead of subtracting once by amount 5
+				stockRequestUrl := fmt.Sprintf("http://%s:%d/stock/subtract/%d/1/", stockServiceHost, stockServicePort, s)
+				fmt.Println(stockRequestUrl)
+				resStockService, err := http.Post(stockRequestUrl, "application/json", nil)
+
+				if err != nil {
+					// TODO maybe have a retry with exponential backoff,
+					//  sometimes network errors happen, we should have at least a few retries
+					//  https://brandur.org/fragments/go-http-retry for reference
+					fmt.Printf("error making http request: %s\n", err)
+				}
+
+				if resStockService.StatusCode == 200 {
+					processedItems = append(processedItems, s)
+				} else if resStockService.StatusCode == 400 {
+					fmt.Println("Could not subtract stock")
+					//rollbackCheckout(order, processedItems)
+					return c.SendStatus(400)
+				}
 			}
 
 		} else {
+			fmt.Println("Could not make the payment")
+			// return error, payment failed, nothing to rollback
 			return c.SendStatus(400)
 		}
 
+		// Update the order value in the orders db
+		resultUpdateOrder := database.Find(&order, orderId).Update("Paid", true)
+		if resultUpdateOrder.RowsAffected == 0 {
+			// orders table could not be updated, rollback transaction
+			rollbackCheckout(order, processedItems)
+			return c.SendStatus(400)
+		} else {
+			// finally transaction is successful
+			return c.SendStatus(200)
+		}
 	}
 
-	return c.SendStatus(500)
+	// order not found
+	return c.SendStatus(404)
+}
+
+// TODO - still need to implement this
+func rollbackCheckout(utils.Order, []int64) {
+	// cancel the payment that was made
+	print()
+	// add back the items to the stock that were currently added
 }
