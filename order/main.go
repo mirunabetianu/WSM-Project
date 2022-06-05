@@ -24,11 +24,6 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 
-	if database == nil {
-		fmt.Printf("", database)
-		return
-	}
-
 	// Routes
 	app.Get("/", hello)
 
@@ -58,10 +53,7 @@ func main() {
 	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
-	err := app.Listen(":3000")
-	if err != nil {
-		return
-	}
+	app.Listen(3000)
 }
 
 // Handlers
