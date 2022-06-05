@@ -1,7 +1,9 @@
-package database
+package utils
 
 import (
+	_ "database/sql"
 	"fmt"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -30,5 +32,11 @@ func OpenPsqlConnection() *gorm.DB {
 	if errDb != nil && errMg != nil {
 		return nil
 	}
-	return db
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		return "connection failed"
+	}
+	return "connection open"
 }
