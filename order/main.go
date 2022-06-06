@@ -87,7 +87,7 @@ func createOrder(c *fiber.Ctx) error {
 	result := database.Create(&order)
 
 	if result.Error != nil {
-		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Could not create order", "data": result.Error})
+		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Could not create order", "data": result.Error.Error()})
 	}
 
 	// Return the created order
@@ -139,8 +139,6 @@ func addItemToOrder(c *fiber.Ctx) error {
 		fmt.Printf("error making http request: %s\n", err)
 		os.Exit(1)
 	}
-
-	//var requestedItem utils.Item
 
 	if res.Status == "500" {
 		return c.SendStatus(400)
@@ -211,18 +209,20 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 
 			var exist bool
 			exist = false
+			var items []int64
 
-			for i, s := range order.Items {
-				if s == int64(item) {
-					order.Items[i] = order.Items[len(order.Items)-1]
+			for _, s := range order.Items {
+				if s == int64(item) && exist == false {
 					exist = true
+				} else {
+					items = append(items, s)
 				}
 			}
 			if !exist {
 				return c.SendStatus(400)
 			}
 
-			result2 := database.Find(&order, orderId).Updates(utils.Order{order.Model, order.Paid, order.UserId, order.TotalCost - int(requestedItem.Price), order.Items[:len(order.Items)-1]})
+			result2 := database.Find(&order, orderId).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost - int(requestedItem.Price), Items: items})
 
 			if result2.RowsAffected == 0 {
 				return c.SendStatus(400)
