@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-service
+spec:
+  type: ClusterIP
+  selector:
+    component: stock
+  ports:
+    - port: 5000
+      name: http
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: stock
+  template:
+    metadata:
+      labels:
+        component: stock
+    spec:
+      containers:
+        - name: stock
+          image: stock:latest

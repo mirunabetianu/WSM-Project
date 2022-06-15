@@ -23,9 +23,7 @@ func main() {
 	utils.Subscribe(mqtt, "topic/wdm")
 	utils.Publish(mqtt, "topic/wdm")
 
-	app.Get("/", func(ctx *fiber.Ctx) error {
-		return ctx.SendString("hello")
-	})
+	app.Get("/stock", baseEndpoint)
 
 	// Create new item with given price
 	app.Post("/stock/item/create/:price", createItem)
@@ -44,6 +42,10 @@ func main() {
 	if err != nil {
 		return
 	}
+}
+
+func baseEndpoint(c *fiber.Ctx) error {
+	return c.Status(200).JSON(fiber.Map{"status": "running"})
 }
 
 func createItem(ctx *fiber.Ctx) error {

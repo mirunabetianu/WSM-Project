@@ -18,3 +18,10 @@ Create a new branch for any added feature/fix and use pull requests.
 - [ ] Setup event based communication between services
 - [ ] Local deployment
 - [ ] Cloud deployment
+
+### Docker commands
+```bash
+docker build -t payment/Dockerfile payment .
+docker build -f stock/Dockerfile -t stock .
+docker build -f order/Dockerfile -t order .
+```

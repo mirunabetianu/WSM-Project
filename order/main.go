@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	utils "order/utils"
 	"strconv"
@@ -15,7 +14,7 @@ func main() {
 	app := fiber.New()
 
 	// Routes
-	app.Get("/", hello)
+	app.Get("/orders", baseEndpoint)
 
 	utils.Subscribe(mqtt, "topic/wdm")
 	utils.Publish(mqtt, "topic/wdm")
@@ -41,12 +40,12 @@ func main() {
 	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
-	app.Listen(3000)
+	app.Listen("3000")
 }
 
 // Handlers
-func hello(c *fiber.Ctx) error {
-	return c.SendString("Hello, Order Service!")
+func baseEndpoint(c *fiber.Ctx) error {
+	return c.Status(200).JSON(fiber.Map{"status": "running"})
 }
 
 func getOrders(c *fiber.Ctx) error {

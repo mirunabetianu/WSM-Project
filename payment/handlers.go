@@ -19,6 +19,10 @@ type Payment struct {
 	OrderID uint
 }
 
+func baseEndpoint(c *fiber.Ctx) error {
+	return c.Status(200).JSON(fiber.Map{"status": "running"})
+}
+
 func findUser(c *fiber.Ctx) error {
 	type Item struct {
 		ID     uint `json:"user_id"`

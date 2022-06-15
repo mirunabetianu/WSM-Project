@@ -9,6 +9,7 @@ func main() {
 	app := fiber.New()
 	connect()
 	// Routes
+	app.Get("/payment", baseEndpoint)
 	app.Post("/payment/pay/:user_id/:order_id/:amount", pay)
 	app.Post("/payment/create_user", createUser)
 	app.Post("/payment/add_funds/:user_id/:amount", addFunds)
