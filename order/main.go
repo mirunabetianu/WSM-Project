@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
@@ -55,7 +56,7 @@ func main() {
 	app.Delete("/orders/removeItem/:order_id/:item_id", removeItemFromOrder)
 
 	// Checkout order
-	app.Post("/orders/checkout/:order_id", checkout)
+	app.Post("/orders/checkout/:order_id", checkoutV2)
 
 	// start server
 	err := app.Listen(":3000")
@@ -314,6 +315,82 @@ func checkout(c *fiber.Ctx) error {
 		if resultUpdateOrder.RowsAffected == 0 {
 			// orders table could not be updated, rollback transaction
 			rollbackCheckout(order, processedItems)
+			return c.SendStatus(400)
+		} else {
+			// finally transaction is successful
+			return c.SendStatus(200)
+		}
+	}
+
+	// order not found
+	return c.SendStatus(404)
+}
+
+func checkoutV2(c *fiber.Ctx) error {
+	orderId := c.Params("order_id")
+
+	// find order by id
+	var order utils.Order
+	result := database.Find(&order, orderId)
+
+	if order.Items == nil {
+		return c.SendStatus(400)
+	}
+	if result.RowsAffected == 1 {
+		//emptyPostBody, _ := json.Marshal(map[string]string{})
+
+		// payment to  /payment/pay/{user_id}/{order_id}/{amount}
+		paymentRequestUrl := fmt.Sprintf("http://%s:%d/payment/pay/%s/%s/%d",
+			paymentServiceHost,
+			paymentServicePort,
+			order.UserId,
+			orderId,
+			order.TotalCost)
+
+		fmt.Println(paymentRequestUrl)
+
+		resPaymentService, err := http.Post(paymentRequestUrl, "application/json", nil)
+
+		if err != nil {
+			fmt.Printf("error making http request: %s\n", err)
+		}
+
+		fmt.Println(resPaymentService)
+		fmt.Println(resPaymentService.Status)
+		fmt.Println(resPaymentService.StatusCode)
+
+		// Subtract stock of all the items via stock service
+		if resPaymentService.StatusCode == 200 {
+
+			// add the array here
+			arrayPostBody, _ := json.Marshal(map[string][]int64{"items": order.Items})
+
+			stockRequestUrl := fmt.Sprintf("http://%s:%d/stock/subtract/all/", stockServiceHost, stockServicePort)
+			fmt.Println(stockRequestUrl)
+			resStockService, err := http.Post(stockRequestUrl, "application/json", bytes.NewBuffer(arrayPostBody))
+
+			if err != nil {
+				// TODO maybe have a retry with exponential backoff,
+				//  sometimes network errors happen, we should have at least a few retries
+				//  https://brandur.org/fragments/go-http-retry for reference
+				fmt.Printf("error making http request: %s\n", err)
+			}
+
+			if resStockService.StatusCode == 400 {
+				fmt.Println("Could not subtract stock")
+				return c.SendStatus(400)
+			}
+
+		} else {
+			fmt.Println("Could not make the payment")
+			// return error, payment failed, nothing to rollback
+			return c.SendStatus(400)
+		}
+
+		// Update the order value in the orders db
+		resultUpdateOrder := database.Find(&order, orderId).Update("Paid", true)
+		if resultUpdateOrder.RowsAffected == 0 {
+			// orders table could not be updated, rollback transaction
 			return c.SendStatus(400)
 		} else {
 			// finally transaction is successful
