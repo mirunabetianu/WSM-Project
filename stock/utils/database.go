@@ -32,11 +32,5 @@ func OpenPsqlConnection() *gorm.DB {
 	if errDb != nil && errMg != nil {
 		return nil
 	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		return "connection failed"
-	}
-	return "connection open"
+	return db
 }

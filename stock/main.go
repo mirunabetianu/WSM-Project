@@ -8,20 +8,21 @@ import (
 )
 
 var database = utils.OpenPsqlConnection()
-var mqtt = utils.OpenMqttConnection()
+
+//var mqtt = utils.OpenMqttConnection()
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
 
 	// Check utils not null
-	if database == nil || mqtt == nil {
+	if database == nil {
 		fmt.Println("Error initializing db and mqtt")
 		return
 	}
 
-	utils.Subscribe(mqtt, "topic/wdm")
-	utils.Publish(mqtt, "topic/wdm")
+	//utils.Subscribe(mqtt, "topic/addItem")
+	//utils.Subscribe(mqtt, "topic/removeItem")
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.SendString("hello")
@@ -49,7 +50,7 @@ func main() {
 func createItem(ctx *fiber.Ctx) error {
 	price, _ := strconv.Atoi(ctx.Params("price"))
 	if price < 0 {
-		ctx.Status(404)
+		ctx.Status(400)
 	}
 
 	item := utils.Item{Price: uint(price)}
@@ -82,7 +83,7 @@ func subtractStockFromItem(ctx *fiber.Ctx) error {
 	amount, _ := strconv.Atoi(ctx.Params("amount"))
 
 	if amount < 0 {
-		ctx.Status(404)
+		ctx.Status(400)
 	}
 
 	var item utils.Item
@@ -93,12 +94,12 @@ func subtractStockFromItem(ctx *fiber.Ctx) error {
 		result2 := database.Find(&item, item_id).Update("Stock", item.Stock-uint(amount))
 
 		if result2.RowsAffected == 0 {
-			return ctx.SendStatus(404)
+			return ctx.SendStatus(400)
 		} else {
 			return ctx.SendStatus(200)
 		}
 	} else {
-		return ctx.SendStatus(404)
+		return ctx.SendStatus(400)
 	}
 }
 
@@ -107,7 +108,7 @@ func addStockToItem(ctx *fiber.Ctx) error {
 	amount, _ := strconv.Atoi(ctx.Params("amount"))
 
 	if amount < 0 {
-		ctx.Status(404)
+		ctx.Status(400)
 	}
 
 	var item utils.Item

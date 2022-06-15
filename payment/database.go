@@ -10,9 +10,9 @@ import (
 // Please change this constants according to your setup
 const (
 	host     = "localhost"
-	port     = 5433
+	port     = 5432
 	user     = "postgres"
-	password = "251219"
+	password = "root"
 	dbname   = "postgres"
 )
 
