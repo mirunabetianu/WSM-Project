@@ -26,6 +26,12 @@ type Order struct {
 	Items     pq.Int64Array `gorm:"type:integer[]"`
 }
 
+type Item struct {
+	gorm.Model
+	Stock uint `json:"stock"`
+	Price uint `json:"price"`
+}
+
 func OpenPsqlConnection() *gorm.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",

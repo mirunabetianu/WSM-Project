@@ -3,13 +3,14 @@ kind: Service
 metadata:
   name: stock-service
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     component: stock
   ports:
     - port: 5000
       name: http
-      targetPort: 5000
+      targetPort: 3001
+      nodePort: 30036
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -27,4 +28,23 @@ spec:
     spec:
       containers:
         - name: stock
-          image: stock:latest
+          # The image needs to be built and pushed to online registry
+          image: farsene/stock
+          imagePullPolicy: Never
+          command: [ "/bin/sh", "-c", "go run main.go" ]
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_PASSWORD

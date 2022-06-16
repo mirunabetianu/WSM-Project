@@ -12,6 +12,9 @@ var mqttClientId = "order_service_id"
 var mqttUsername = "order_service"
 var mqttPassword = "public"
 
+var TOPIC_ADD_ITEM = "topic/addItem"
+var TOPIC_REMOVE_ITEM = "topic/removeItem"
+
 func OpenMqttConnection() mqtt.Client {
 	// init required options
 	opts := mqtt.NewClientOptions()
@@ -33,6 +36,11 @@ func OpenMqttConnection() mqtt.Client {
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
+	if msg.Topic() == TOPIC_ADD_ITEM {
+
+	} else if msg.Topic() == TOPIC_REMOVE_ITEM {
+
+	}
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {

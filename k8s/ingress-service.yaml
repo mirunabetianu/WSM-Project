@@ -9,13 +9,13 @@ spec:
  rules:
    - http:
       paths:
-        - path: /orders/?(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: order-service
-              port:
-                number: 5000
+        # - path: /orders/?(.*)
+        #   pathType: Prefix
+        #   backend:
+        #     service:
+        #       name: order-service
+        #       port:
+        #         number: 5000
         - path: /stock/?(.*)
           pathType: Prefix
           backend:
@@ -23,10 +23,10 @@ spec:
               name: stock-service
               port:
                 number: 5000
-        - path: /payment/?(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: user-service
-              port:
-                number: 5000
+        # - path: /payment/?(.*)
+        #   pathType: Prefix
+        #   backend:
+        #     service:
+        #       name: user-service
+        #       port:
+        #         number: 5000
