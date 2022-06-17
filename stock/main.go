@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	utils "stock/utils"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 var database = utils.OpenPsqlConnection()
@@ -20,9 +21,6 @@ func main() {
 		return
 	}
 
-	utils.Subscribe(mqtt, "topic/wdm")
-	utils.Publish(mqtt, "topic/wdm")
-
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.SendString("hello")
 	})
@@ -35,6 +33,8 @@ func main() {
 
 	// Subtract stock amount from item given id and amount
 	app.Post("/stock/subtract/:item_id/:amount", subtractStockFromItem)
+	// listen for other services subtractStock events
+	utils.Subscribe(mqtt, "topic/subtractStock", subtractStockFromItemLogic)
 
 	// Add stock amount to the item
 	app.Post("/stock/add/:item_id/:amount", addStockToItem)
@@ -77,29 +77,35 @@ func getItem(ctx *fiber.Ctx) error {
 	return ctx.Status(200).JSON(&item)
 }
 
-func subtractStockFromItem(ctx *fiber.Ctx) error {
-	item_id := ctx.Params("item_id")
-	amount, _ := strconv.Atoi(ctx.Params("amount"))
-
+func subtractStockFromItemLogic(payload []string) (string, string) {
+	item_id := payload[0]
+	_amount := payload[1]
+	amount, _ := strconv.Atoi(_amount)
 	if amount < 0 {
-		ctx.Status(404)
+		return "", "500"
 	}
-
 	var item utils.Item
-
 	result := database.Find(&item, item_id)
-
 	if result.RowsAffected == 1 && item.Stock >= uint(amount) {
 		result2 := database.Find(&item, item_id).Update("Stock", item.Stock-uint(amount))
 
 		if result2.RowsAffected == 0 {
-			return ctx.SendStatus(404)
+			return "", "404"
 		} else {
-			return ctx.SendStatus(200)
+			return "success", "200"
 		}
 	} else {
-		return ctx.SendStatus(404)
+		return "", "404"
 	}
+}
+
+func subtractStockFromItem(ctx *fiber.Ctx) error {
+	item_id := ctx.Params("item_id")
+	amount := ctx.Params("amount")
+	_, status := subtractStockFromItemLogic([]string{item_id, amount})
+	int_status, _ := strconv.Atoi(status)
+	return ctx.SendStatus(int_status)
+
 }
 
 func addStockToItem(ctx *fiber.Ctx) error {

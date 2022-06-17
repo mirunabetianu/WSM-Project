@@ -2,8 +2,9 @@ package utils
 
 import (
 	"fmt"
+	"strings"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"time"
 )
 
 var mqttBroker = "localhost"
@@ -20,6 +21,7 @@ func OpenMqttConnection() mqtt.Client {
 	opts.SetUsername(mqttUsername)
 	opts.SetPassword(mqttPassword)
 	opts.SetDefaultPublishHandler(messagePubHandler)
+	opts.SetOrderMatters(false)
 	opts.OnConnect = connectHandler
 	opts.OnConnectionLost = connectLostHandler
 
@@ -29,6 +31,25 @@ func OpenMqttConnection() mqtt.Client {
 		panic(token.Error())
 	}
 	return client
+}
+
+//@input func function --> the function that the mqtt callback will call
+//@output func: a mqtt callback function
+var generateMessageHandler = func(function any) mqtt.MessageHandler {
+	var callBack mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+		payload := strings.Split(string(msg.Payload()), "/")
+		var f = function.(func([]string) (string, string))
+		if !msg.Retained() {
+			res, err := f(payload)
+			response_id := payload[len(payload)-1]
+			Publish(res+"/"+err+"/"+response_id, client, "topic/response")
+		}
+	}
+	return callBack
+}
+
+var hadnleSubtract mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
 }
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
@@ -43,18 +64,15 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 	fmt.Printf("Connect lost: %v", err)
 }
 
-func Publish(client mqtt.Client, topic string) {
-	num := 100
-	for i := 0; i < num; i++ {
-		text := fmt.Sprintf("Message %d de la %s", i, mqttUsername)
-		token := client.Publish(topic, 0, false, text)
-		token.Wait()
-		time.Sleep(time.Second)
-	}
+func Publish(payload interface{}, client mqtt.Client, topic string) {
+	fmt.Printf("\npublishing to topic: %v with payload: %v\n", topic, payload)
+	token := client.Publish(topic, 0, true, payload)
+	token.Wait()
 }
 
-func Subscribe(client mqtt.Client, topic string) {
-	token := client.Subscribe(topic, 1, nil)
+func Subscribe(client mqtt.Client, topic string, fun func([]string) (string, string)) {
+	fmt.Printf("subscribing to topic: %v", topic)
+	var handler_function = generateMessageHandler(fun)
+	token := client.Subscribe(topic, 0, handler_function)
 	token.Wait()
-	fmt.Printf("Subscribed to topic: %s", topic)
 }

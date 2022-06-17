@@ -2,8 +2,9 @@ package utils
 
 import (
 	"fmt"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 var mqttBroker = "localhost"
@@ -20,6 +21,7 @@ func OpenMqttConnection() mqtt.Client {
 	opts.SetUsername(mqttUsername)
 	opts.SetPassword(mqttPassword)
 	opts.SetDefaultPublishHandler(messagePubHandler)
+	opts.SetOrderMatters(false)
 	opts.OnConnect = connectHandler
 	opts.OnConnectionLost = connectLostHandler
 
@@ -43,18 +45,21 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 	fmt.Printf("Connect lost: %v", err)
 }
 
-func Publish(client mqtt.Client, topic string) {
-	num := 100
-	for i := 0; i < num; i++ {
-		text := fmt.Sprintf("Message %d de la %s", i, mqttUsername)
-		token := client.Publish(topic, 0, false, text)
-		token.Wait()
-		time.Sleep(time.Second)
-	}
+func Publish(payload interface{}, client mqtt.Client, topic string) {
+	fmt.Printf("\npublishing to topic: %v with payload: %v\n", topic, payload)
+	token := client.Publish(topic, 0, true, payload)
+	token.Wait()
+	time.Sleep(time.Second)
 }
 
 func Subscribe(client mqtt.Client, topic string) {
 	token := client.Subscribe(topic, 1, nil)
 	token.Wait()
-	fmt.Printf("Subscribed to topic: %s", topic)
+	fmt.Printf("subscribing to topic: %v", topic)
+}
+
+func SubscribeForResponse(client mqtt.Client, topic string, responseReceived mqtt.MessageHandler) {
+	token := client.Subscribe(topic, 1, responseReceived)
+	token.Wait()
+	fmt.Printf("subscribing to (response) topic: %v", topic)
 }

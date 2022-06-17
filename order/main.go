@@ -2,23 +2,55 @@ package main
 
 import (
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	utils "order/utils"
 	"strconv"
+	"strings"
+	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/lithammer/shortuuid"
 )
 
-var mqtt = utils.OpenMqttConnection()
+var mqttClient = utils.OpenMqttConnection()
 var database = utils.OpenPsqlConnection()
 
+//@NOTE: if the request is sent, then it times out but after the time-out
+// the request is fullfilled by the called service, there is no way of changing the Timeout response.
+const WAIT_TIME = time.Duration(5 * time.Second)
+
+var responses = make(map[string]Response)
+
+type Response struct {
+	has_arrived bool
+	response    string
+	error_code  int
+}
+
+//is triggered when other services push a response
+var responseReceived mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	payload := strings.Split(string(msg.Payload()), "/")
+	fmt.Printf("\nresponse received: %v\n", payload)
+	if entry, ok := responses[payload[len(payload)-1]]; ok {
+		entry.has_arrived = true
+		entry.response = payload[0]
+		error_code, _ := strconv.Atoi(payload[1])
+		entry.error_code = error_code
+		responses[payload[len(payload)-1]] = entry
+
+	}
+}
+
 func main() {
+	fmt.Println("Hello World")
+
+	utils.SubscribeForResponse(mqttClient, "topic/response", responseReceived)
 	// Fiber instance
 	app := fiber.New()
-
 	// Routes
 	app.Get("/", hello)
 
-	utils.Subscribe(mqtt, "topic/wdm")
-	utils.Publish(mqtt, "topic/wdm")
 	// Get all orders
 	app.Get("/orders/getAll", getOrders)
 
@@ -41,7 +73,7 @@ func main() {
 	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
-	app.Listen(3000)
+	app.Listen(":3000")
 }
 
 // Handlers
@@ -119,7 +151,20 @@ func addItemToOrder(c *fiber.Ctx) error {
 		if result2.RowsAffected == 0 {
 			return c.SendStatus(400)
 		} else {
-			return c.SendStatus(200)
+			request_id := shortuuid.New()
+			responses[request_id] = Response{}
+			var payload string = itemId + "/1/" + request_id
+			utils.Publish(payload, mqttClient, "topic/subtractStock")
+
+			//wait for response
+			start := time.Now()
+			for !responses[request_id].has_arrived {
+				if time.Since(start) >= WAIT_TIME {
+					return c.SendStatus(408)
+				}
+				time.Sleep(1 * time.Nanosecond) // to avoid "concurrent map read and map write" error
+			}
+			return c.SendStatus(responses[request_id].error_code)
 		}
 	} else {
 		return c.SendStatus(400)
