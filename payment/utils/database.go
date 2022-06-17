@@ -1,10 +1,10 @@
-package main
+package utils
 
 import (
 	"fmt"
-	"os"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"os"
 )
 
 // Please change this constants according to your setup
@@ -18,20 +18,20 @@ var (
 
 var Database *gorm.DB
 
-func connect() (error, *gorm.DB) {
-	if(getEnv("POSTGRES_DB") != "") {
+func Connect() (error, *gorm.DB) {
+	if getEnv("POSTGRES_DB") != "" {
 		dbname = getEnv("POSTGRES_DB")
 	}
-	
-	if (getEnv("POSTGRES_USER") != "") {
+
+	if getEnv("POSTGRES_USER") != "" {
 		user = getEnv("POSTGRES_USER")
-	} 
-	
-	if (getEnv("POSTGRES_PASSWORD") != "") {
+	}
+
+	if getEnv("POSTGRES_PASSWORD") != "" {
 		password = getEnv("POSTGRES_PASSWORD")
 	}
-	
-	if (getEnv("POSTGRES_SERVICE_HOST") != "") {
+
+	if getEnv("POSTGRES_SERVICE_HOST") != "" {
 		host = getEnv("POSTGRES_SERVICE_HOST")
 	}
 
@@ -49,7 +49,7 @@ func connect() (error, *gorm.DB) {
 	return err, Database
 }
 
-func getEnv(key string) string{
+func getEnv(key string) string {
 	val, ok := os.LookupEnv(key)
 	if !ok {
 		return ""

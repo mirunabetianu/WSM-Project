@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -19,11 +19,11 @@ type Payment struct {
 	OrderID uint
 }
 
-func baseEndpoint(c *fiber.Ctx) error {
+func BaseEndpoint(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"status": "running"})
 }
 
-func findUser(c *fiber.Ctx) error {
+func FindUser(c *fiber.Ctx) error {
 	type Item struct {
 		ID     uint `json:"user_id"`
 		Credit uint `json:"credit"`
@@ -38,7 +38,7 @@ func findUser(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"user_id": user.ID, "credit": user.Credit})
 }
 
-func createUser(c *fiber.Ctx) error {
+func CreateUser(c *fiber.Ctx) error {
 	type Item struct {
 		User_id uint `json:"user_id"`
 	}
@@ -52,7 +52,7 @@ func createUser(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"user_id": user.ID})
 }
 
-func addFunds(c *fiber.Ctx) error {
+func AddFunds(c *fiber.Ctx) error {
 
 	var user_id string
 	var amount uint
@@ -82,7 +82,7 @@ func addFunds(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"done": true})
 }
 
-func pay(c *fiber.Ctx) error {
+func Pay(c *fiber.Ctx) error {
 
 	user_id := c.Params("user_id")
 	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
@@ -135,7 +135,7 @@ func pay(c *fiber.Ctx) error {
 	return c.SendStatus(200)
 }
 
-func paymentCancel(c *fiber.Ctx) error {
+func PaymentCancel(c *fiber.Ctx) error {
 	//user_id := c.Params("user_id")
 
 	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)
@@ -161,7 +161,7 @@ func paymentCancel(c *fiber.Ctx) error {
 	return c.SendStatus(200)
 }
 
-func paymentStatus(c *fiber.Ctx) error {
+func PaymentStatus(c *fiber.Ctx) error {
 	//user_id := c.Params("user_id")
 
 	temp_orderid, err := strconv.ParseUint(c.Params("order_id"), 10, 64)

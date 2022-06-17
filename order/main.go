@@ -24,6 +24,22 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_HOST") != "" {
+		stockServiceHost = utils.GetEnv("STOCK_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP") != "" {
+		stockServicePort, _ = strconv.Atoi(utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST") != "" {
+		paymentServiceHost = utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP") != "" {
+		paymentServicePort, _ = strconv.Atoi(utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
 	if database == nil {
 		fmt.Printf("", database)
 		return
