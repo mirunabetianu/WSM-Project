@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: stock-service
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     component: stock
   ports:
@@ -29,7 +29,7 @@ spec:
         - name: stock
           # The image needs to be built and pushed to online registry
           image: farsene/stock
-          command: [ "/bin/sh", "-c", "go run *.go" ]
+          command: [ "/bin/sh", "-c", "go run main.go" ]
           env:
             - name: POSTGRES_DB
               valueFrom:

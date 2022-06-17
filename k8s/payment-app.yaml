@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: payment-service
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
-    component: stock
+    component: payment
   ports:
     - port: 5000
       name: http

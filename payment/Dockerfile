@@ -10,6 +10,3 @@ COPY . .
 RUN go build .
 
 EXPOSE 3002
-
-
-# CMD ["go", "run", "main.go"]
