@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -49,7 +48,7 @@ func Publish(payload interface{}, client mqtt.Client, topic string) {
 	fmt.Printf("\npublishing to topic: %v with payload: %v\n", topic, payload)
 	token := client.Publish(topic, 0, true, payload)
 	token.Wait()
-	time.Sleep(time.Second)
+	//time.Sleep(time.Second)
 }
 
 func Subscribe(client mqtt.Client, topic string) {
