@@ -12,8 +12,8 @@ var (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
-	password = "Miruna999"
-	dbname   = "wsm"
+	password = "root"
+	dbname   = "postgres"
 )
 
 type Item struct {
@@ -22,7 +22,7 @@ type Item struct {
 	Price uint `gorm:"default:0"`
 }
 
-func getEnv(key string) string{
+func GetEnv(key string) string {
 	val, ok := os.LookupEnv(key)
 	if !ok {
 		return ""
@@ -33,22 +33,22 @@ func getEnv(key string) string{
 
 func OpenPsqlConnection() *gorm.DB {
 
-	if(getEnv("POSTGRES_DB") != "") {
-		dbname = getEnv("POSTGRES_DB")
-	}
-	
-	if (getEnv("POSTGRES_USER") != "") {
-		user = getEnv("POSTGRES_USER")
-	} 
-	
-	if (getEnv("POSTGRES_PASSWORD") != "") {
-		password = getEnv("POSTGRES_PASSWORD")
+	if GetEnv("POSTGRES_DB") != "" {
+		dbname = GetEnv("POSTGRES_DB")
 	}
 
-	if (getEnv("POSTGRES_SERVICE_HOST") != "") {
-		host = getEnv("POSTGRES_SERVICE_HOST")
+	if GetEnv("POSTGRES_USER") != "" {
+		user = GetEnv("POSTGRES_USER")
 	}
-	
+
+	if GetEnv("POSTGRES_PASSWORD") != "" {
+		password = GetEnv("POSTGRES_PASSWORD")
+	}
+
+	if GetEnv("POSTGRES_SERVICE_HOST") != "" {
+		host = GetEnv("POSTGRES_SERVICE_HOST")
+	}
+
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)

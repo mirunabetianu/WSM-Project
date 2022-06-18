@@ -14,6 +14,10 @@ var mqttPassword = "public"
 var Chans = make(map[string]chan string)
 
 func OpenMqttConnection() mqtt.Client {
+	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
+		mqttBroker = GetEnv("EMQX_BROKER_SERVICE_HOST")
+	}
+
 	// init required options
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", mqttBroker, mqttPort))

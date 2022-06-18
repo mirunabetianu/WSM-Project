@@ -28,7 +28,7 @@ spec:
       containers:
         - name: stock
           # The image needs to be built and pushed to online registry
-          image: farsene/stock
+          image: farsene/stock-mqtt
           command: [ "/bin/sh", "-c", "go run main.go" ]
           env:
             - name: POSTGRES_DB

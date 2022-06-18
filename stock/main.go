@@ -25,6 +25,10 @@ func main() {
 	token.Wait()
 	fmt.Printf("Subscribed to topic: %s", "topic/addItem")
 
+	fmt.Printf("Trying to publish to: %s", "topic/addItem")
+	token = mqttC.Publish("topic/addItem", 1, false, "orderId:1-itemId:1")
+	token.Wait()
+
 	app.Get("/stock", baseEndpoint)
 
 	// Create new item with given price

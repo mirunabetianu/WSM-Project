@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: emqx-broker
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: emqx-broker
+  template:
+    metadata:
+      labels:
+        app: emqx-broker
+    spec:
+      containers:
+        - name: emqx-broker
+          image: hivemq/hivemq-ce
+          imagePullPolicy: "IfNotPresent"
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: emqx-broker
+  labels:
+    app: emqx-broker 
+spec:
+  type: NodePort
+  ports:
+    - port: 1883
+      targetPort: 1883
+  selector:
+    app: emqx-broker

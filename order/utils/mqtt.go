@@ -19,6 +19,9 @@ var TOPIC_REMOVE_ITEM = "topic/removeItem"
 var ItemChannel = make(chan string)
 
 func OpenMqttConnection() mqtt.Client {
+	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
+		mqttBroker = GetEnv("EMQX_BROKER_SERVICE_HOST")
+	}
 	// init required options
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", mqttBroker, mqttPort))
@@ -39,7 +42,7 @@ func OpenMqttConnection() mqtt.Client {
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	go func(chan string) {
-		println(string(msg.Payload()))
+		// println(string(msg.Payload()))
 		switch {
 		case msg.Topic() == "topic/addItemResponse":
 			var itemId, itemPrice, status, orderId int
