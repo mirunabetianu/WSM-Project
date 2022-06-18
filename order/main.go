@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-//var mqtt = utils.OpenMqttConnection()
+var mqtt = utils.OpenMqttConnection()
 var database = utils.OpenPsqlConnection()
 
 var stockServiceHost = "localhost"
@@ -29,13 +29,12 @@ func main() {
 		return
 	}
 
+	token := mqtt.Subscribe("topic/addItemResponse", 1, nil)
+	token.Wait()
+
 	// Routes
 	app.Get("/", hello)
 
-	//utils.Subscribe(mqtt, utils.TOPIC_ADD_ITEM)
-	//utils.Subscribe(mqtt, utils.TOPIC_REMOVE_ITEM)
-	//utils.Publish(mqtt, utils.TOPIC_ADD_ITEM)
-	//utils.Publish(mqtt, utils.TOPIC_REMOVE_ITEM)
 	// Get all orders
 	app.Get("/orders/getAll", getOrders)
 
@@ -121,41 +120,40 @@ func findOrder(c *fiber.Ctx) error {
 }
 
 func addItemToOrder(c *fiber.Ctx) error {
-	orderId := c.Params("order_id")
-	itemId := c.Params("item_id")
+	order_id := c.Params("order_id")
+	item_id := c.Params("item_id")
 
 	var order utils.Order
 
-	//mqtt.Publish(utils.TOPIC_ADD_ITEM, 1, false, itemId)
-	item, errConversion := strconv.Atoi(itemId)
-
-	if errConversion != nil {
+	itemId, errConversionI := strconv.Atoi(item_id)
+	orderId, errConversionO := strconv.Atoi(order_id)
+	if errConversionI != nil || errConversionO != nil {
 		return c.SendStatus(400)
 	}
 
-	requestURL := fmt.Sprintf("http://%s:%d/stock/find/%d", stockServiceHost, stockServicePort, item)
-	res, err := http.Get(requestURL)
-	if err != nil {
-		fmt.Printf("error making http request: %s\n", err)
-		os.Exit(1)
-	}
+	channelKey := fmt.Sprintf("orderId:%d-itemId:%d", orderId, itemId)
 
-	if res.Status == "500" {
+	token := mqtt.Publish(utils.TOPIC_ADD_ITEM, 1, false, channelKey)
+	token.Wait()
+
+	//received := <-utils.Chans[channelKey]
+	received := <-utils.ItemChannel
+
+	var itemPrice int
+	print("this is ")
+	println(received)
+	_, err := fmt.Sscanf(received, "orderId:%d-itemId:%d-price:%d", &orderId, &itemId, &itemPrice)
+
+	println(err.Error())
+	if received == "error" || err != nil {
 		return c.SendStatus(400)
 	} else {
-		body, _ := ioutil.ReadAll(res.Body)
 
-		s := string(body)
-		requestedItem := utils.Item{}
-		err := json.Unmarshal([]byte(s), &requestedItem)
-		if err != nil {
-			return c.SendStatus(400)
-		}
-
-		result := database.Find(&order, orderId)
+		print("i'm here")
+		result := database.Find(&order, order_id)
 
 		if result.RowsAffected == 1 {
-			result2 := database.Find(&order, orderId).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost + int(requestedItem.Price), Items: append(order.Items, int64(item))})
+			result2 := database.Find(&order, order_id).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost + itemPrice, Items: append(order.Items, int64(itemId))})
 
 			if result2.RowsAffected == 0 {
 				return c.SendStatus(400)

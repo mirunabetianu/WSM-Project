@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"time"
 )
 
 var mqttBroker = "localhost"
@@ -14,6 +13,10 @@ var mqttPassword = "public"
 
 var TOPIC_ADD_ITEM = "topic/addItem"
 var TOPIC_REMOVE_ITEM = "topic/removeItem"
+
+//var Chans = make(map[string]chan int)
+
+var ItemChannel = make(chan string)
 
 func OpenMqttConnection() mqtt.Client {
 	// init required options
@@ -35,12 +38,25 @@ func OpenMqttConnection() mqtt.Client {
 }
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-	if msg.Topic() == TOPIC_ADD_ITEM {
+	go func(chan string) {
+		println(string(msg.Payload()))
+		switch {
+		case msg.Topic() == "topic/addItemResponse":
+			var itemId, itemPrice, status, orderId int
+			_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d", &orderId, &itemId, &itemPrice, &status)
+			channelKey := fmt.Sprintf("orderId:%d-itemId:%d-price:%d", orderId, itemId, itemPrice)
 
-	} else if msg.Topic() == TOPIC_REMOVE_ITEM {
-
-	}
+			println(status)
+			if err != nil || status == 500 {
+				ItemChannel <- "error"
+				//print(len(Chans))
+			} else {
+				ItemChannel <- channelKey
+				//Chans[channelKey] <- itemPrice
+			}
+		default:
+		}
+	}(ItemChannel)
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
@@ -49,20 +65,4 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
 	fmt.Printf("Connect lost: %v", err)
-}
-
-func Publish(client mqtt.Client, topic string) {
-	num := 100
-	for i := 0; i < num; i++ {
-		text := fmt.Sprintf("Message %d de la %s", i, mqttUsername)
-		token := client.Publish(topic, 0, false, text)
-		token.Wait()
-		time.Sleep(time.Second)
-	}
-}
-
-func Subscribe(client mqtt.Client, topic string) {
-	token := client.Subscribe(topic, 1, nil)
-	token.Wait()
-	fmt.Printf("Subscribed to topic: %s", topic)
 }

@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofiber/fiber/v2"
 	utils "stock/utils"
 	"strconv"
 )
 
 var database = utils.OpenPsqlConnection()
-
-//var mqtt = utils.OpenMqttConnection()
+var mqttC = utils.OpenMqttConnection()
 
 func main() {
 	// Fiber instance
@@ -21,8 +21,9 @@ func main() {
 		return
 	}
 
-	//utils.Subscribe(mqtt, "topic/addItem")
-	//utils.Subscribe(mqtt, "topic/removeItem")
+	token := mqttC.Subscribe("topic/addItem", 1, FindItemLocal)
+	token.Wait()
+	fmt.Printf("Subscribed to topic: %s", "topic/addItem")
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.SendString("hello")
@@ -120,4 +121,26 @@ func addStockToItem(ctx *fiber.Ctx) error {
 	} else {
 		return ctx.SendStatus(200)
 	}
+}
+
+func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
+	var orderId, itemId int
+
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d", &orderId, &itemId)
+
+	var item utils.Item
+	result := database.Find(&item, itemId)
+
+	var status int
+	if result.RowsAffected == 0 || err != nil {
+		status = 500
+	} else {
+		status = 200
+	}
+
+	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d", orderId, itemId, item.Price, status)
+
+	print(finalResult)
+	token := mqttC.Publish("topic/addItemResponse", 1, false, finalResult)
+	token.Wait()
 }

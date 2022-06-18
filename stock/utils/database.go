@@ -3,7 +3,6 @@ package utils
 import (
 	_ "database/sql"
 	"fmt"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -12,8 +11,8 @@ const (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
-	password = "root"
-	dbname   = "postgres"
+	password = "Miruna999"
+	dbname   = "wsm"
 )
 
 type Item struct {
