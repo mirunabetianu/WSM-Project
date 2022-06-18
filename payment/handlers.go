@@ -2,22 +2,12 @@ package main
 
 import (
 	"fmt"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"payment/utils"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 )
-
-type User struct {
-	gorm.Model
-	Credit uint
-}
-
-type Payment struct {
-	gorm.Model
-	Status  byte
-	OrderID uint
-}
 
 func findUser(c *fiber.Ctx) error {
 	type Item struct {
@@ -25,8 +15,8 @@ func findUser(c *fiber.Ctx) error {
 		Credit uint `json:"credit"`
 	}
 	user_id := c.Params("user_id")
-	var user User
-	result := Database.First(&user, user_id)
+	var user utils.User
+	result := utils.Database.First(&user, user_id)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(404).JSON(fiber.Map{"error": error_message})
@@ -38,8 +28,8 @@ func createUser(c *fiber.Ctx) error {
 	type Item struct {
 		User_id uint `json:"user_id"`
 	}
-	user := &User{Credit: 0}
-	result := Database.Create(user)
+	user := &utils.User{Credit: 0}
+	result := utils.Database.Create(user)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(500).JSON(fiber.Map{"error": error_message})
@@ -61,15 +51,15 @@ func addFunds(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"done": false, "error": error_message})
 	}
 
-	var user User
-	result := Database.First(&user, user_id)
+	var user utils.User
+	result := utils.Database.First(&user, user_id)
 	fmt.Printf("result: %v, rows affected %v\n", result.Error, result.RowsAffected)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(404).JSON(fiber.Map{"done": false, "error": error_message})
 	}
 	user.Credit = user.Credit + amount
-	save_result := Database.Save(&user)
+	save_result := utils.Database.Save(&user)
 	fmt.Printf("result: %v, rows affected %v\n", save_result.Error, save_result.RowsAffected)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
 		error_message := fmt.Sprint(save_result.Error)
@@ -95,8 +85,8 @@ func pay(c *fiber.Ctx) error {
 	}
 	amount := uint(temp_amount)
 
-	var user User
-	result := Database.First(&user, user_id)
+	var user utils.User
+	result := utils.Database.First(&user, user_id)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(404).JSON(fiber.Map{"error": error_message})
@@ -107,23 +97,23 @@ func pay(c *fiber.Ctx) error {
 	}
 
 	user.Credit = user.Credit - amount
-	save_result := Database.Save(&user)
+	save_result := utils.Database.Save(&user)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
 		error_message := fmt.Sprint(save_result.Error)
 		return c.Status(500).JSON(fiber.Map{"error": error_message})
 	}
 
-	var payment Payment
-	exists := Database.Where(Payment{OrderID: order_id}).First(&payment).Error
+	var payment utils.Payment
+	exists := utils.Database.Where(utils.Payment{OrderID: order_id}).First(&payment).Error
 	fmt.Printf("payment: %v\n", payment)
 	fmt.Printf("error: %v\n", exists)
 	if exists == nil {
 		return c.Status(500).JSON(fiber.Map{"error": "payment already exists"})
 	}
 
-	payment = Payment{Status: 0, OrderID: order_id}
+	payment = utils.Payment{Status: 0, OrderID: order_id}
 
-	result_payment := Database.Create(&payment)
+	result_payment := utils.Database.Create(&payment)
 	if result_payment.Error != nil {
 		error_message := fmt.Sprint(result_payment.Error)
 		return c.Status(500).JSON(fiber.Map{"error": error_message})
@@ -141,15 +131,15 @@ func paymentCancel(c *fiber.Ctx) error {
 	}
 	order_id := uint(temp_orderid)
 
-	var payment Payment
-	result := Database.Where(Payment{OrderID: order_id}).First(&payment)
+	var payment utils.Payment
+	result := utils.Database.Where(utils.Payment{OrderID: order_id}).First(&payment)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(404).JSON(fiber.Map{"error": error_message})
 	}
 
 	payment.Status = 1
-	save_result := Database.Save(&payment)
+	save_result := utils.Database.Save(&payment)
 	if save_result.Error != nil || save_result.RowsAffected != 1 {
 		error_message := fmt.Sprint(save_result.Error)
 		return c.Status(500).JSON(fiber.Map{"error": error_message})
@@ -166,8 +156,8 @@ func paymentStatus(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": error_message})
 	}
 	order_id := uint(temp_orderid)
-	var payment Payment
-	result := Database.Where(Payment{OrderID: order_id}).First(&payment)
+	var payment utils.Payment
+	result := utils.Database.Where(utils.Payment{OrderID: order_id}).First(&payment)
 	if result.Error != nil {
 		error_message := fmt.Sprint(result.Error)
 		return c.Status(404).JSON(fiber.Map{"error": error_message})
@@ -180,4 +170,50 @@ func paymentStatus(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"paid": paid})
+}
+
+func SubtractAmountLocal(client mqtt.Client, msg mqtt.Message) {
+	var orderId, totalCost int
+	var userId string
+
+	print(string(msg.Payload()))
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-userId:%s", &orderId, &totalCost, &userId)
+
+	var user utils.User
+	responseUser := utils.Database.Find(&user, userId)
+
+	notEnoughCredit := user.Credit-(uint(totalCost)) < 0
+
+	println(err != nil)
+	println(responseUser.Error != nil)
+	println(notEnoughCredit)
+	if err != nil || responseUser.Error != nil || notEnoughCredit {
+		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+		token.Wait()
+	} else {
+		var payment utils.Payment
+		resultPayment := utils.Database.Where(utils.Payment{OrderID: uint(orderId)}).First(&payment)
+		responseUpdate := utils.Database.Find(&user, userId).Updates(utils.User{Credit: user.Credit - (uint(totalCost))})
+
+		if responseUpdate.Error != nil || resultPayment.Error == nil {
+			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+			token.Wait()
+		} else {
+			payment = utils.Payment{Status: 0, OrderID: uint(orderId)}
+			resultCreatePayment := utils.Database.Create(&payment)
+
+			if resultCreatePayment.Error != nil {
+				payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+				token.Wait()
+			} else {
+				payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+				token.Wait()
+			}
+		}
+
+	}
 }

@@ -1,8 +1,7 @@
-package main
+package utils
 
 import (
 	"fmt"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -12,14 +11,25 @@ const (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
-	password = "root"
-	dbname   = "postgres"
+	password = "Miruna999"
+	dbname   = "wsm"
 )
 
 var databaseInfo = fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 var Database *gorm.DB
 
-func connect() (error, *gorm.DB) {
+type User struct {
+	gorm.Model
+	Credit uint
+}
+
+type Payment struct {
+	gorm.Model
+	Status  byte
+	OrderID uint
+}
+
+func OpenPsqlConnection() (error, *gorm.DB) {
 	var err error
 	Database, err = gorm.Open(postgres.Open(databaseInfo), &gorm.Config{})
 	if err != nil {

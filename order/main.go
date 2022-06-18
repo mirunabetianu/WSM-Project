@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"math"
-	"net/http"
 	utils "order/utils"
 	"strconv"
 )
@@ -29,6 +29,12 @@ func main() {
 
 	token := mqtt.Subscribe("topic/findItemResponse", 1, nil)
 	token.Wait()
+
+	tokenS := mqtt.Subscribe("topic/subtractStockResponse", 1, nil)
+	tokenS.Wait()
+
+	tokenP := mqtt.Subscribe("topic/paymentResponse", 1, nil)
+	tokenP.Wait()
 
 	// Routes
 	app.Get("/", hello)
@@ -134,10 +140,10 @@ func addItemToOrder(c *fiber.Ctx) error {
 	token := mqtt.Publish("topic/findItem", 1, false, channelKey)
 	token.Wait()
 
-	utils.Chans = append(utils.Chans, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
-	index := len(utils.Chans) - 1
+	utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+	index := len(utils.ItemChannels) - 1
 
-	itemPrice := <-utils.Chans[index].Channel
+	itemPrice := <-utils.ItemChannels[index].Channel
 
 	if itemPrice == math.MaxInt {
 		return c.SendStatus(400)
@@ -181,10 +187,10 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 		token := mqtt.Publish("topic/findItem", 1, false, channelKey)
 		token.Wait()
 
-		utils.Chans = append(utils.Chans, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
-		index := len(utils.Chans) - 1
+		utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+		index := len(utils.ItemChannels) - 1
 
-		itemPrice := <-utils.Chans[index].Channel
+		itemPrice := <-utils.ItemChannels[index].Channel
 
 		if itemPrice == math.MaxInt {
 			return c.SendStatus(400)
@@ -217,89 +223,42 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 	}
 }
 
-//TODO
-// Note: currently we make the subtract call of the stock service for each item we have,
-// this might be the bottleneck of the application if we checkout a lot of items,
-// I am making the assumption that most orders have few items
 func checkout(c *fiber.Ctx) error {
-	orderId := c.Params("order_id")
+	order_id := c.Params("order_id")
 
 	// find order by id
 	var order utils.Order
-	result := database.Find(&order, orderId)
+	result := database.Find(&order, order_id)
 
-	if order.Items == nil {
+	orderId, errConversionO := strconv.Atoi(order_id)
+	items, err := json.Marshal(map[string][]int64{"items": append(order.Items, int64(orderId))})
+
+	if order.Items == nil || err != nil || errConversionO != nil {
 		return c.SendStatus(400)
 	}
 	if result.RowsAffected == 1 {
-		//emptyPostBody, _ := json.Marshal(map[string]string{})
+		channelKey := fmt.Sprintf("orderId:%d-amount:%d-userId:%s", orderId, order.TotalCost, order.UserId)
+		token := mqtt.Publish("topic/payment", 1, false, channelKey)
+		token.Wait()
 
-		// payment to  /payment/pay/{user_id}/{order_id}/{amount}
-		paymentRequestUrl := fmt.Sprintf("http://%s:%d/payment/pay/%s/%s/%d",
-			paymentServiceHost,
-			paymentServicePort,
-			order.UserId,
-			orderId,
-			order.TotalCost)
+		tokenN := mqtt.Publish("topic/subtractStock", 1, false, items)
+		tokenN.Wait()
+		utils.CheckoutChannels = append(utils.CheckoutChannels, utils.CheckoutItem{OrderId: orderId, PaymentChannel: make(chan string), StockChannel: make(chan string)})
+		index := len(utils.CheckoutChannels) - 1
 
-		fmt.Println(paymentRequestUrl)
+		print(index)
 
-		resPaymentService, err := http.Post(paymentRequestUrl, "application/json", nil)
+		resultPayment := <-utils.CheckoutChannels[index].PaymentChannel
+		resultStock := <-utils.CheckoutChannels[index].StockChannel
 
-		if err != nil {
-			fmt.Printf("error making http request: %s\n", err)
-		}
+		if resultStock == "error" || resultPayment == "error" {
+			return c.SendStatus(404)
+		} else {
+			resultUpdateOrder := database.Find(&order, orderId).Update("Paid", true)
 
-		// keep a list of the item_id for which subtract stock call was successful
-		// in case we need to rollback the transaction we need to add the stock again
-		var processedItems []int64
-
-		fmt.Println(resPaymentService)
-		fmt.Println(resPaymentService.Status)
-		fmt.Println(resPaymentService.StatusCode)
-
-		// Subtract stock of all the items via stock service
-		if resPaymentService.StatusCode == 200 {
-			fmt.Println(order.Items)
-			// iterate through all the items of the current order
-			for i, s := range order.Items {
-				fmt.Println(i, s)
-				// TODO we simply subtract 1 for each item id, if we have item_id 5 times, we subtract 1 5 times instead of subtracting once by amount 5
-				stockRequestUrl := fmt.Sprintf("http://%s:%d/stock/subtract/%d/1/", stockServiceHost, stockServicePort, s)
-				fmt.Println(stockRequestUrl)
-				resStockService, err := http.Post(stockRequestUrl, "application/json", nil)
-
-				if err != nil {
-					// TODO maybe have a retry with exponential backoff,
-					//  sometimes network errors happen, we should have at least a few retries
-					//  https://brandur.org/fragments/go-http-retry for reference
-					fmt.Printf("error making http request: %s\n", err)
-				}
-
-				if resStockService.StatusCode == 200 {
-					processedItems = append(processedItems, s)
-				} else if resStockService.StatusCode == 400 {
-					fmt.Println("Could not subtract stock")
-					//rollbackCheckout(order, processedItems)
-					return c.SendStatus(400)
-				}
+			if resultUpdateOrder.Error == nil {
+				return c.SendStatus(200)
 			}
-
-		} else {
-			fmt.Println("Could not make the payment")
-			// return error, payment failed, nothing to rollback
-			return c.SendStatus(400)
-		}
-
-		// Update the order value in the orders db
-		resultUpdateOrder := database.Find(&order, orderId).Update("Paid", true)
-		if resultUpdateOrder.RowsAffected == 0 {
-			// orders table could not be updated, rollback transaction
-			rollbackCheckout(order, processedItems)
-			return c.SendStatus(400)
-		} else {
-			// finally transaction is successful
-			return c.SendStatus(200)
 		}
 	}
 

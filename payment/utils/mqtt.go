@@ -7,8 +7,8 @@ import (
 
 var mqttBroker = "localhost"
 var mqttPort = 1883
-var mqttClientId = "stock_service_id"
-var mqttUsername = "stock_service"
+var mqttClientId = "payment_service_id"
+var mqttUsername = "payment_service"
 var mqttPassword = "public"
 
 func OpenMqttConnection() mqtt.Client {
@@ -40,5 +40,5 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 }
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("Connect lost: %v", err)
+	fmt.Printf("OpenPsqlConnection lost: %v", err)
 }

@@ -2,12 +2,22 @@ package main
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"payment/utils"
 )
+
+var mqttC = utils.OpenMqttConnection()
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
-	connect()
+	err, _ := utils.OpenPsqlConnection()
+	if err != nil {
+		return
+	}
+
+	token := mqttC.Subscribe("topic/payment", 1, SubtractAmountLocal)
+	token.Wait()
+
 	// Routes
 	app.Post("/payment/pay/:user_id/:order_id/:amount", pay)
 	app.Post("/payment/create_user", createUser)
@@ -19,3 +29,4 @@ func main() {
 	// start server
 	app.Listen(":3002")
 }
+
