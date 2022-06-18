@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofiber/fiber/v2"
@@ -39,6 +40,9 @@ func main() {
 
 	// Subtract stock amount from item given id and amount
 	app.Post("/stock/subtract/:item_id/:amount", subtractStockFromItem)
+
+	// Subtract stock amount from the array of items, happening during order checkout
+	app.Post("/stock/subtract/all", subtractStockFromItems)
 
 	// Add stock amount to the item
 	app.Post("/stock/add/:item_id/:amount", addStockToItem)
@@ -108,6 +112,20 @@ func subtractStockFromItem(ctx *fiber.Ctx) error {
 	} else {
 		return ctx.SendStatus(400)
 	}
+}
+
+func subtractStockFromItems(ctx *fiber.Ctx) error {
+	var body map[string][]int64
+
+	err := json.Unmarshal(ctx.Body(), &body)
+
+	if err != nil {
+		return ctx.SendStatus(400)
+	}
+
+	fmt.Println(body)
+
+	return ctx.SendStatus(200)
 }
 
 func addStockToItem(ctx *fiber.Ctx) error {
