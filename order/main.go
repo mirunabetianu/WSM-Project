@@ -76,6 +76,7 @@ func main() {
 	// start server
 	err := app.Listen(":3000")
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 }
@@ -107,7 +108,7 @@ func createOrder(c *fiber.Ctx) error {
 	}
 
 	// Return the created order
-	return c.Status(200).JSON(fiber.Map{"orderId": order.ID})
+	return c.Status(200).JSON(fiber.Map{"order_id": order.ID})
 }
 
 func removeOrder(c *fiber.Ctx) error {
