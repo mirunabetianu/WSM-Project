@@ -223,7 +223,8 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 				return c.SendStatus(400)
 			}
 
-			result2 := database.Find(&order, orderId).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost - itemPrice, Items: items})
+			//result2 := database.Find(&order, orderId).Updates(utils.Order{TotalCost: order.TotalCost - itemPrice, Items: items})
+			result2 := database.Model(&order).Select("TotalCost", "Items").Updates(utils.Order{TotalCost: order.TotalCost - itemPrice, Items: items})
 
 			if result2.RowsAffected == 0 {
 				return c.SendStatus(400)

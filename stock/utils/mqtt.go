@@ -3,12 +3,14 @@ package utils
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 )
 
+var id = uuid.New()
 var mqttBroker = "localhost"
 var mqttPort = 1883
-var mqttClientId = "stock_service_id"
-var mqttUsername = "stock_service"
+var mqttClientId = "stock_service_id" + id.String()
+var mqttUsername = "stock_service" + id.String()
 var mqttPassword = "public"
 
 var Chans = make(map[string]chan string)
