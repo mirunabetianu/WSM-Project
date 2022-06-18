@@ -140,16 +140,12 @@ func addItemToOrder(c *fiber.Ctx) error {
 	received := <-utils.ItemChannel
 
 	var itemPrice int
-	print("this is ")
-	println(received)
+
 	_, err := fmt.Sscanf(received, "orderId:%d-itemId:%d-price:%d", &orderId, &itemId, &itemPrice)
 
-	println(err.Error())
 	if received == "error" || err != nil {
 		return c.SendStatus(400)
 	} else {
-
-		print("i'm here")
 		result := database.Find(&order, order_id)
 
 		if result.RowsAffected == 1 {
