@@ -7,10 +7,11 @@ import (
 	_ "github.com/lib/pq"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"os"
 )
 
 // Please change this constant according to your setup
-const (
+var (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
@@ -33,6 +34,22 @@ type Item struct {
 }
 
 func OpenPsqlConnection() *gorm.DB {
+	if GetEnv("POSTGRES_DB") != "" {
+		dbname = GetEnv("POSTGRES_DB")
+	}
+
+	if GetEnv("POSTGRES_USER") != "" {
+		user = GetEnv("POSTGRES_USER")
+	}
+
+	if GetEnv("POSTGRES_PASSWORD") != "" {
+		password = GetEnv("POSTGRES_PASSWORD")
+	}
+
+	if GetEnv("POSTGRES_SERVICE_HOST") != "" {
+		host = GetEnv("POSTGRES_SERVICE_HOST")
+	}
+
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
@@ -43,4 +60,13 @@ func OpenPsqlConnection() *gorm.DB {
 		return nil
 	}
 	return db
+}
+
+func GetEnv(key string) string {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return ""
+	} else {
+		return val
+	}
 }

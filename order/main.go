@@ -24,6 +24,22 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_HOST") != "" {
+		stockServiceHost = utils.GetEnv("STOCK_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP") != "" {
+		stockServicePort, _ = strconv.Atoi(utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST") != "" {
+		paymentServiceHost = utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP") != "" {
+		paymentServicePort, _ = strconv.Atoi(utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
 	if database == nil {
 		fmt.Printf("", database)
 		return
@@ -33,7 +49,7 @@ func main() {
 	token.Wait()
 
 	// Routes
-	app.Get("/", hello)
+	app.Get("/orders", baseEndpoint)
 
 	// Get all orders
 	app.Get("/orders/getAll", getOrders)
@@ -59,13 +75,14 @@ func main() {
 	// start server
 	err := app.Listen(":3000")
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 }
 
 // Handlers
-func hello(c *fiber.Ctx) error {
-	return c.SendString("Hello, Order Service!")
+func baseEndpoint(c *fiber.Ctx) error {
+	return c.Status(200).JSON(fiber.Map{"status": "running"})
 }
 
 func getOrders(c *fiber.Ctx) error {
@@ -90,7 +107,7 @@ func createOrder(c *fiber.Ctx) error {
 	}
 
 	// Return the created order
-	return c.Status(200).JSON(fiber.Map{"orderId": order.ID})
+	return c.Status(200).JSON(fiber.Map{"order_id": order.ID})
 }
 
 func removeOrder(c *fiber.Ctx) error {
