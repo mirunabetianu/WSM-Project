@@ -7,3 +7,5 @@
 go.work
 
 pkg/
+
+.DS_Store

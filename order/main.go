@@ -24,13 +24,29 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_HOST") != "" {
+		stockServiceHost = utils.GetEnv("STOCK_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP") != "" {
+		stockServicePort, _ = strconv.Atoi(utils.GetEnv("STOCK_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST") != "" {
+		paymentServiceHost = utils.GetEnv("PAYMENT_SERVICE_SERVICE_HOST")
+	}
+
+	if utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP") != "" {
+		paymentServicePort, _ = strconv.Atoi(utils.GetEnv("PAYMENT_SERVICE_SERVICE_PORT_HTTP"))
+	}
+
 	if database == nil {
 		fmt.Printf("", database)
 		return
 	}
 
 	// Routes
-	app.Get("/", hello)
+	app.Get("/orders", baseEndpoint)
 
 	//utils.Subscribe(mqtt, utils.TOPIC_ADD_ITEM)
 	//utils.Subscribe(mqtt, utils.TOPIC_REMOVE_ITEM)
@@ -65,8 +81,8 @@ func main() {
 }
 
 // Handlers
-func hello(c *fiber.Ctx) error {
-	return c.SendString("Hello, Order Service!")
+func baseEndpoint(c *fiber.Ctx) error {
+	return c.Status(200).JSON(fiber.Map{"status": "running"})
 }
 
 func getOrders(c *fiber.Ctx) error {
