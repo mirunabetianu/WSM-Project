@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"io/ioutil"
+	"math"
 	"net/http"
 	utils "order/utils"
-	"os"
 	"strconv"
 )
 
@@ -45,7 +43,7 @@ func main() {
 		return
 	}
 
-	token := mqtt.Subscribe("topic/addItemResponse", 1, nil)
+	token := mqtt.Subscribe("topic/findItemResponse", 1, nil)
 	token.Wait()
 
 	// Routes
@@ -150,17 +148,15 @@ func addItemToOrder(c *fiber.Ctx) error {
 
 	channelKey := fmt.Sprintf("orderId:%d-itemId:%d", orderId, itemId)
 
-	token := mqtt.Publish(utils.TOPIC_ADD_ITEM, 1, false, channelKey)
+	token := mqtt.Publish("topic/findItem", 1, false, channelKey)
 	token.Wait()
 
-	//received := <-utils.Chans[channelKey]
-	received := <-utils.ItemChannel
+	utils.Chans = append(utils.Chans, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+	index := len(utils.Chans) - 1
 
-	var itemPrice int
+	itemPrice := <-utils.Chans[index].Channel
 
-	_, err := fmt.Sscanf(received, "orderId:%d-itemId:%d-price:%d", &orderId, &itemId, &itemPrice)
-
-	if received == "error" || err != nil {
+	if itemPrice == math.MaxInt {
 		return c.SendStatus(400)
 	} else {
 		result := database.Find(&order, order_id)
@@ -180,50 +176,42 @@ func addItemToOrder(c *fiber.Ctx) error {
 }
 
 func removeItemFromOrder(c *fiber.Ctx) error {
-	orderId := c.Params("order_id")
-	itemId := c.Params("item_id")
+	order_id := c.Params("order_id")
+	item_id := c.Params("item_id")
 
 	var order utils.Order
 
-	result := database.Find(&order, orderId)
+	result := database.Find(&order, order_id)
 
 	if order.Items == nil {
 		return c.SendStatus(400)
 	}
 	if result.RowsAffected == 1 {
-		item, errConversion := strconv.Atoi(itemId)
-
-		if errConversion != nil {
+		itemId, errConversionI := strconv.Atoi(item_id)
+		orderId, errConversionO := strconv.Atoi(order_id)
+		if errConversionI != nil || errConversionO != nil {
 			return c.SendStatus(400)
 		}
 
-		requestURL := fmt.Sprintf("http://%s:%d/stock/find/%d", stockServiceHost, stockServicePort, item)
-		res, err := http.Get(requestURL)
-		if err != nil {
-			fmt.Printf("error making http request: %s\n", err)
-			os.Exit(1)
-		}
+		channelKey := fmt.Sprintf("orderId:%d-itemId:%d", orderId, itemId)
 
-		if res.Status == "500" {
+		token := mqtt.Publish("topic/findItem", 1, false, channelKey)
+		token.Wait()
+
+		utils.Chans = append(utils.Chans, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+		index := len(utils.Chans) - 1
+
+		itemPrice := <-utils.Chans[index].Channel
+
+		if itemPrice == math.MaxInt {
 			return c.SendStatus(400)
 		} else {
-			body, _ := ioutil.ReadAll(res.Body)
-
-			s := string(body)
-			requestedItem := utils.Item{}
-			err := json.Unmarshal([]byte(s), &requestedItem)
-			if err != nil {
-				return c.SendStatus(400)
-			}
-
-			//var requestedItem utils.Item
-
 			var exist bool
 			exist = false
 			var items []int64
 
 			for _, s := range order.Items {
-				if s == int64(item) && exist == false {
+				if s == int64(itemId) && exist == false {
 					exist = true
 				} else {
 					items = append(items, s)
@@ -233,7 +221,7 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 				return c.SendStatus(400)
 			}
 
-			result2 := database.Find(&order, orderId).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost - int(requestedItem.Price), Items: items})
+			result2 := database.Find(&order, orderId).Updates(utils.Order{Model: order.Model, Paid: order.Paid, UserId: order.UserId, TotalCost: order.TotalCost - itemPrice, Items: items})
 
 			if result2.RowsAffected == 0 {
 				return c.SendStatus(400)
