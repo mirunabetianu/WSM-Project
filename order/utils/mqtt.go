@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"math"
 )
 
 var mqttBroker = "localhost"
@@ -11,12 +12,13 @@ var mqttClientId = "order_service_id"
 var mqttUsername = "order_service"
 var mqttPassword = "public"
 
-var TOPIC_ADD_ITEM = "topic/addItem"
-var TOPIC_REMOVE_ITEM = "topic/removeItem"
+type ItemChannel struct {
+	OrderId int
+	ItemId  int
+	Channel chan int
+}
 
-//var Chans = make(map[string]chan int)
-
-var ItemChannel = make(chan string)
+var Chans []ItemChannel
 
 func OpenMqttConnection() mqtt.Client {
 	// init required options
@@ -38,25 +40,28 @@ func OpenMqttConnection() mqtt.Client {
 }
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	go func(chan string) {
-		println(string(msg.Payload()))
-		switch {
-		case msg.Topic() == "topic/addItemResponse":
-			var itemId, itemPrice, status, orderId int
-			_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d", &orderId, &itemId, &itemPrice, &status)
-			channelKey := fmt.Sprintf("orderId:%d-itemId:%d-price:%d", orderId, itemId, itemPrice)
-
-			println(status)
-			if err != nil || status == 500 {
-				ItemChannel <- "error"
-				//print(len(Chans))
-			} else {
-				ItemChannel <- channelKey
-				//Chans[channelKey] <- itemPrice
+	switch {
+	case msg.Topic() == "topic/findItemResponse":
+		var itemId, itemPrice, status, orderId int
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d", &orderId, &itemId, &itemPrice, &status)
+		var index int
+		for i := range Chans {
+			x := len(Chans) - i - 1
+			if Chans[x].OrderId == orderId && Chans[x].ItemId == itemId {
+				index = x
+				break
 			}
-		default:
 		}
-	}(ItemChannel)
+		go func(chan int) {
+			if err != nil || status == 500 {
+				Chans[index].Channel <- math.MaxInt
+			} else {
+				Chans[index].Channel <- itemPrice
+			}
+		}(Chans[index].Channel)
+	default:
+	}
+
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {

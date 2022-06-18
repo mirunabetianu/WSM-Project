@@ -21,7 +21,7 @@ func main() {
 		return
 	}
 
-	token := mqttC.Subscribe("topic/addItem", 1, FindItemLocal)
+	token := mqttC.Subscribe("topic/findItem", 1, FindItemLocal)
 	token.Wait()
 	fmt.Printf("Subscribed to topic: %s", "topic/addItem")
 
@@ -141,6 +141,6 @@ func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d", orderId, itemId, item.Price, status)
 
 	print(finalResult)
-	token := mqttC.Publish("topic/addItemResponse", 1, false, finalResult)
+	token := mqttC.Publish("topic/findItemResponse", 1, false, finalResult)
 	token.Wait()
 }
