@@ -77,7 +77,7 @@ func main() {
 	app.Delete("/orders/removeItem/:order_id/:item_id", removeItemFromOrder)
 
 	// Checkout order
-	app.Post("/orders/checkout/:order_id", checkoutV2)
+	app.Post("/orders/checkout/:order_id", checkout)
 
 	// start server
 	err := app.Listen(":3000")
@@ -162,7 +162,14 @@ func addItemToOrder(c *fiber.Ctx) error {
 	token.Wait()
 
 	utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{Id: id.String(), OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
-	index := len(utils.ItemChannels) - 1
+	var index int
+	for i := range utils.ItemChannels {
+		x := len(utils.ItemChannels) - i - 1
+		if utils.ItemChannels[x].Id == id.String() {
+			index = x
+			break
+		}
+	}
 
 	itemPrice := <-utils.ItemChannels[index].Channel
 
@@ -210,7 +217,14 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 		token.Wait()
 
 		utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{Id: id.String(), OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
-		index := len(utils.ItemChannels) - 1
+		var index int
+		for i := range utils.ItemChannels {
+			x := len(utils.ItemChannels) - i - 1
+			if utils.ItemChannels[x].Id == id.String() {
+				index = x
+				break
+			}
+		}
 
 		itemPrice := <-utils.ItemChannels[index].Channel
 
@@ -268,7 +282,14 @@ func checkout(c *fiber.Ctx) error {
 		tokenN := mqtt.Publish("topic/subtractStock", 1, false, items)
 		tokenN.Wait()
 		utils.CheckoutChannels = append(utils.CheckoutChannels, utils.CheckoutItem{Id: id.ID(), OrderId: orderId, PaymentChannel: make(chan string), StockChannel: make(chan string)})
-		index := len(utils.CheckoutChannels) - 1
+		var index int
+		for i := range utils.CheckoutChannels {
+			x := len(utils.CheckoutChannels) - i - 1
+			if utils.CheckoutChannels[x].Id == id.ID() {
+				index = x
+				break
+			}
+		}
 
 		print(index)
 

@@ -189,7 +189,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	itemIds = itemIds[:len(itemIds)-1]
 	fmt.Println(itemIds)
 
-	dict := make(map[int64]int)
+	dict := make(map[int64]uint)
 	for _, num := range itemIds {
 		dict[num] = dict[num] + 1
 	}
@@ -218,8 +218,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 		var anyError bool
 		anyError = false
 		for index, value := range dict {
-
-			resultItem := database.Find(&item, index).Update("Stock", item.Stock-uint(value))
+			resultItem := database.Find(&item, index).Update("Stock", item.Stock-value)
 
 			if resultItem.Error != nil {
 				anyError = true
