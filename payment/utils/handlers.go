@@ -41,9 +41,11 @@ func AddFunds(c *fiber.Ctx) error {
 	user_id = c.Params("user_id")
 	amount = c.Params("amount")
 
-	amountToPay, errConversion := strconv.Atoi(amount)
+	amountToPay, errConversion := strconv.ParseFloat(amount, 64)
 
 	if errConversion != nil {
+		fmt.Println("Conversion error")
+		fmt.Println(errConversion)
 		return c.Status(500).JSON(fiber.Map{"done": false})
 	}
 
@@ -52,6 +54,7 @@ func AddFunds(c *fiber.Ctx) error {
 	result := Database.Find(&user, user_id).Update("Credit", user.Credit+uint(amountToPay))
 
 	if result.RowsAffected == 0 {
+		fmt.Println("0 rows affected")
 		return c.Status(500).JSON(fiber.Map{"done": false})
 	}
 	return c.Status(200).JSON(fiber.Map{"done": true})
