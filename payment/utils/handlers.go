@@ -37,31 +37,22 @@ func CreateUser(c *fiber.Ctx) error {
 }
 
 func AddFunds(c *fiber.Ctx) error {
-
-	var user_id string
-	var amount uint
+	var user_id, amount string
 	user_id = c.Params("user_id")
-	amount_temp, err := strconv.ParseUint(c.Params("amount"), 10, 64)
-	amount = uint(amount_temp)
+	amount = c.Params("amount")
 
-	if err != nil {
-		error_message := fmt.Sprint(err)
-		return c.Status(500).JSON(fiber.Map{"done": false, "error": error_message})
+	amountToPay, errConversion := strconv.Atoi(amount)
+
+	if errConversion != nil {
+		return c.Status(500).JSON(fiber.Map{"done": false})
 	}
 
 	var user User
-	result := Database.First(&user, user_id)
-	fmt.Printf("result: %v, rows affected %v\n", result.Error, result.RowsAffected)
-	if result.Error != nil {
-		error_message := fmt.Sprint(result.Error)
-		return c.Status(404).JSON(fiber.Map{"done": false, "error": error_message})
-	}
-	user.Credit = user.Credit + amount
-	save_result := Database.Save(&user)
-	fmt.Printf("result: %v, rows affected %v\n", save_result.Error, save_result.RowsAffected)
-	if save_result.Error != nil || save_result.RowsAffected != 1 {
-		error_message := fmt.Sprint(save_result.Error)
-		return c.Status(500).JSON(fiber.Map{"done": false, "error": error_message})
+
+	result := Database.Find(&user, user_id).Update("Credit", user.Credit+uint(amountToPay))
+
+	if result.RowsAffected == 0 {
+		return c.Status(500).JSON(fiber.Map{"done": false})
 	}
 	return c.Status(200).JSON(fiber.Map{"done": true})
 }
