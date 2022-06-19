@@ -174,8 +174,9 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 	var orderId, totalCost int
 	var userId string
 
-	print(string(msg.Payload()))
-	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-userId:%s", &orderId, &totalCost, &userId)
+	var id uint32
+
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-id:%d-userId:%s", &orderId, &totalCost, &id, &userId)
 
 	var user User
 	responseUser := Database.Find(&user, userId)
@@ -186,7 +187,7 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 	println(responseUser.Error != nil)
 	println(notEnoughCredit)
 	if err != nil || responseUser.Error != nil || notEnoughCredit {
-		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 		token.Wait()
 	} else {
@@ -195,7 +196,7 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 		responseUpdate := Database.Find(&user, userId).Updates(User{Credit: user.Credit - (uint(totalCost))})
 
 		if responseUpdate.Error != nil || resultPayment.Error == nil {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 			token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 			token.Wait()
 		} else {
@@ -203,11 +204,11 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 			resultCreatePayment := Database.Create(&payment)
 
 			if resultCreatePayment.Error != nil {
-				payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+				payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 				token.Wait()
 			} else {
-				payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+				payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "success")
 				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 				token.Wait()
 			}
