@@ -5,6 +5,7 @@ import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm/clause"
 	utils "stock/utils"
 	"strconv"
 )
@@ -193,36 +194,61 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	var notEnoughStock bool
 	notEnoughStock = false
 
-	for index, value := range dict {
-		var item utils.Item
-		resultItem := database.Find(&item, index)
+	var itemRows []utils.Item
+	database.Table("items").Where("id IN ?", itemIds).Select("id", "stock", "price").Scan(&itemRows)
 
-		if resultItem.Error != nil || int(item.Stock)-int(value) < 0 {
+	itemRowsCopy := make([]utils.Item, len(itemRows))
+	copy(itemRowsCopy, itemRows)
+
+	for index, targetRow := range itemRows {
+		if targetRow.Stock >= dict[int64(targetRow.ID)] {
+			itemRows[index].Stock = targetRow.Stock - dict[int64(targetRow.ID)]
+		} else {
 			notEnoughStock = true
 		}
 	}
+
+	//for index, value := range dict {
+	//	var item utils.Item
+	//	resultItem := database.Find(&item, index)
+	//
+	//	if resultItem.Error != nil || int(item.Stock)-int(value) < 0 {
+	//		notEnoughStock = true
+	//	}
+	//}
 
 	if err != nil || notEnoughStock {
 		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 		token.Wait()
 	} else {
-		var anyError bool
-		anyError = false
-		for index, value := range dict {
-			var item utils.Item
+		result := database.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"stock"}),
+		}).Create(&itemRows)
 
-			resultItem := database.Find(&item, index).Update("Stock", (uint)(int(item.Stock)-int(value)))
+		//var anyError bool
+		//anyError = false
+		//for index, value := range dict {
+		//	var item utils.Item
+		//
+		//	resultItem := database.Find(&item, index).Update("Stock", (uint)(int(item.Stock)-int(value)))
+		//
+		//	if resultItem.Error != nil {
+		//		anyError = true
+		//	}
+		//}
 
-			if resultItem.Error != nil {
-				anyError = true
-			}
-		}
-
-		if anyError {
+		if int(result.RowsAffected) < len(dict) {
 			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 			token.Wait()
+
+			database.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"stock"}),
+			}).Create(&itemRowsCopy)
+
 		} else {
 			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "success")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
