@@ -1,0 +1,3 @@
+$rgName="rg-wsdm-group-7"               # define resource group name
+$rgLocation="westeurope"                # define the location of the resource group
+az group create --name $rgName --location $rgLocation

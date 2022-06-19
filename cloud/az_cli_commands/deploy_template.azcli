@@ -1,0 +1,18 @@
+$templateFile="cloud\main.bicep"                        # fill in path to the templateFile you want to deploy
+$deploymentName="testDeployment"                        # define the name of this deployment
+$rgName="rg-wsdm-group-7"                               # define the name of the resource group you want to deploy to
+$location="westeurope"
+$managementGroupID="mg-wsdm-main"
+$subscriptionID="9099b3a1-0df5-488d-9381-64c13acc2c6a"
+$featureFlag='{\"eventGrid\" : true, \"aks\" : true, \"serviceBus\" : false}' # define what resources should be deployed
+az deployment mg create --name $deploymentName --management-group-id $managementGroupID --template-file $templateFile --location $location --parameters location=$location subscriptionID=$subscriptionID resourceGroupName=$rgName featureFlag=$featureFlag
+
+# if you only want to see what happens if you run the script: 
+$templateFile="cloud\main.bicep"                        # fill in path to the templateFile you want to deploy
+$deploymentName="testDeployment"                        # define the name of this deployment
+$rgName="rg-wsdm-group-7"                               # define the name of the resource group you want to deploy to
+$location="westeurope"
+$managementGroupID="mg-wsdm-main"
+$subscriptionID="9099b3a1-0df5-488d-9381-64c13acc2c6a"
+$featureFlag='{\"eventGrid\" : true, \"aks\" : true, \"serviceBus\" : false}' # define what resources should be deployed
+az deployment mg create --name $deploymentName --management-group-id $managementGroupID --template-file $templateFile --location $location --parameters location=$location subscriptionID=$subscriptionID resourceGroupName=$rgName featureFlag=$featureFlag --what-if
