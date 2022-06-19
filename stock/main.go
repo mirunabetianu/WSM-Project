@@ -89,7 +89,7 @@ func getItem(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(404)
 	}
 
-	return ctx.Status(200).JSON(&item)
+	return ctx.Status(200).JSON(fiber.Map{"stock": item.Stock, "price": item.Price})
 }
 
 func subtractStockFromItem(ctx *fiber.Ctx) error {
