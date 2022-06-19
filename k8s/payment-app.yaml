@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: payment-service
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     component: payment
   ports:
-    - port: 5000
+    - port: 5002
       name: http
       targetPort: 3002
 ---
@@ -28,7 +28,7 @@ spec:
       containers:
         - name: payment
           # The image needs to be built and pushed to online registry
-          image: farsene/payment
+          image: farsene/payment-mqtt
           command: [ "/bin/sh", "-c", "go run main.go" ]
           env:
             - name: POSTGRES_DB
