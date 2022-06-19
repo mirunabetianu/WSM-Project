@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"math"
-	"net/http"
 	utils "order/utils"
 	"strconv"
 )
@@ -261,7 +259,6 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 				return c.SendStatus(400)
 			}
 
-			//result2 := database.Find(&order, orderId).Updates(utils.Order{TotalCost: order.TotalCost - itemPrice, Items: items})
 			result2 := database.Model(&order).Select("TotalCost", "Items").Updates(utils.Order{TotalCost: order.TotalCost - itemPrice, Items: items})
 
 			if result2.RowsAffected == 0 {
@@ -307,11 +304,10 @@ func checkout(c *fiber.Ctx) error {
 			}
 		}
 		var resultPayment, resultStock string
+		
 		go func(chan string) {
 			resultPayment = <-utils.CheckoutChannels[index].PaymentChannel
 		}(utils.CheckoutChannels[index].PaymentChannel)
-
-		fmt.Printf("Payment: %s \n Stock: %s \n", resultPayment, resultStock)
 
 		if resultPayment == "error" {
 			return c.SendStatus(404)
@@ -319,39 +315,6 @@ func checkout(c *fiber.Ctx) error {
 		go func(chan string) {
 			resultStock = <-utils.CheckoutChannels[index].StockChannel
 		}(utils.CheckoutChannels[index].StockChannel)
-
-		//if resultStock != "error" && resultPayment == "error" {
-		//	newId := uuid.New()
-		//
-		//	refundKey := fmt.Sprintf("amount:%d-id:%d-userId:%s", order.TotalCost, newId.ID(), order.UserId)
-		//
-		//	tokenR := mqtt.Publish("topic/refund", 1, false, refundKey)
-		//	tokenR.Wait()
-		//
-		//	utils.RefundChannels = append(utils.RefundChannels, utils.RefundItem{Id: newId.ID(), RefundChannel: make(chan string)})
-		//
-		//	var index int
-		//	for i := range utils.RefundChannels {
-		//		x := len(utils.RefundChannels) - i - 1
-		//		if utils.RefundChannels[x].Id == newId.ID() {
-		//			index = x
-		//			break
-		//		}
-		//	}
-		//
-		//	var resultRefund string
-		//	go func(chan string) {
-		//		resultRefund = <-utils.RefundChannels[index].RefundChannel
-		//	}(utils.RefundChannels[index].RefundChannel)
-		//
-		//	fmt.Printf("Refund: %s\n", resultRefund)
-		//
-		//	if resultRefund == "error" {
-		//		return c.SendStatus(500)
-		//	} else {
-		//		return c.SendStatus(404)
-		//	}
-		//}
 
 		if resultStock == "error" || resultPayment == "error" {
 			return c.SendStatus(404)
@@ -364,89 +327,5 @@ func checkout(c *fiber.Ctx) error {
 		}
 	}
 
-	// order not found
 	return c.SendStatus(404)
-}
-
-func checkoutV2(c *fiber.Ctx) error {
-	orderId := c.Params("order_id")
-
-	// find order by id
-	var order utils.Order
-	result := database.Find(&order, orderId)
-
-	if order.Items == nil {
-		return c.SendStatus(400)
-	}
-	if result.RowsAffected == 1 {
-		//emptyPostBody, _ := json.Marshal(map[string]string{})
-
-		// payment to  /payment/pay/{user_id}/{order_id}/{amount}
-		paymentRequestUrl := fmt.Sprintf("http://%s:%d/payment/pay/%s/%s/%d",
-			paymentServiceHost,
-			paymentServicePort,
-			order.UserId,
-			orderId,
-			order.TotalCost)
-
-		fmt.Println(paymentRequestUrl)
-
-		resPaymentService, err := http.Post(paymentRequestUrl, "application/json", nil)
-
-		if err != nil {
-			fmt.Printf("error making http request: %s\n", err)
-		}
-
-		fmt.Println(resPaymentService)
-		fmt.Println(resPaymentService.Status)
-		fmt.Println(resPaymentService.StatusCode)
-
-		// Subtract stock of all the items via stock service
-		if resPaymentService.StatusCode == 200 {
-
-			// add the array here
-			arrayPostBody, _ := json.Marshal(map[string][]int64{"items": order.Items})
-
-			stockRequestUrl := fmt.Sprintf("http://%s:%d/stock/subtract/all/", stockServiceHost, stockServicePort)
-			fmt.Println(stockRequestUrl)
-			resStockService, err := http.Post(stockRequestUrl, "application/json", bytes.NewBuffer(arrayPostBody))
-
-			if err != nil {
-				// TODO maybe have a retry with exponential backoff,
-				//  sometimes network errors happen, we should have at least a few retries
-				//  https://brandur.org/fragments/go-http-retry for reference
-				fmt.Printf("error making http request: %s\n", err)
-			}
-
-			if resStockService.StatusCode == 400 {
-				fmt.Println("Could not subtract stock")
-				return c.SendStatus(400)
-			}
-
-		} else {
-			fmt.Println("Could not make the payment")
-			// return error, payment failed, nothing to rollback
-			return c.SendStatus(400)
-		}
-
-		// Update the order value in the orders db
-		resultUpdateOrder := database.Find(&order, orderId).Update("Paid", true)
-		if resultUpdateOrder.RowsAffected == 0 {
-			// orders table could not be updated, rollback transaction
-			return c.SendStatus(400)
-		} else {
-			// finally transaction is successful
-			return c.SendStatus(200)
-		}
-	}
-
-	// order not found
-	return c.SendStatus(404)
-}
-
-// TODO - still need to implement this
-func rollbackCheckout(utils.Order, []int64) {
-	// cancel the payment that was made
-	print()
-	// add back the items to the stock that were currently added
 }
