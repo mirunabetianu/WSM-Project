@@ -8,17 +8,15 @@ import (
 )
 
 func FindUser(c *fiber.Ctx) error {
-	type Item struct {
-		ID     uint `json:"user_id"`
-		Credit uint `json:"credit"`
-	}
-	user_id := c.Params("user_id")
+	id := c.Params("user_id")
 	var user User
-	result := Database.First(&user, user_id)
-	if result.Error != nil {
-		error_message := fmt.Sprint(result.Error)
-		return c.Status(404).JSON(fiber.Map{"error": error_message})
+
+	result := Database.Find(&user, id)
+
+	if result.RowsAffected == 0 {
+		return c.SendStatus(404)
 	}
+
 	return c.Status(200).JSON(fiber.Map{"user_id": user.ID, "credit": user.Credit})
 }
 
