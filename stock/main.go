@@ -212,7 +212,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 		for index, value := range dict {
 			var item utils.Item
 
-			resultItem := database.Find(&item, index).Update("Stock", item.Stock-value)
+			resultItem := database.Find(&item, index).Update("Stock", (uint)(int(item.Stock)-int(value)))
 
 			if resultItem.Error != nil {
 				anyError = true
