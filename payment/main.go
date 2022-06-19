@@ -18,6 +18,9 @@ func main() {
 	token := mqttC.Subscribe("topic/payment", 1, utils.SubtractAmountLocal)
 	token.Wait()
 
+	tokenR := mqttC.Subscribe("topic/refund", 1, utils.RefundAmountLocal)
+	tokenR.Wait()
+
 	// Routes
 	//app.Get("/payment", utils.BaseEndpoint)
 	app.Post("/payment/pay/:user_id/:order_id/:amount", utils.Pay)

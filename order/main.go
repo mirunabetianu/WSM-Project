@@ -55,6 +55,9 @@ func main() {
 	tokenP := mqtt.Subscribe("topic/paymentResponse", 1, nil)
 	tokenP.Wait()
 
+	tokenR := mqtt.Subscribe("topic/refundResponse", 1, nil)
+	tokenR.Wait()
+
 	// Routes
 	app.Get("/orders", baseEndpoint)
 
@@ -299,10 +302,41 @@ func checkout(c *fiber.Ctx) error {
 			}
 		}
 
-		print(index)
-
 		resultPayment := <-utils.CheckoutChannels[index].PaymentChannel
 		resultStock := <-utils.CheckoutChannels[index].StockChannel
+
+		fmt.Printf("Payment: %s \n Stock: %s \n", resultPayment, resultStock)
+
+		if resultStock != "error" && resultPayment == "error" {
+			fmt.Println("Suntt in cazul asta")
+			newId := uuid.New()
+
+			refundKey := fmt.Sprintf("amount:%d-id:%d-userId:%s", order.TotalCost, newId.ID(), order.UserId)
+
+			tokenR := mqtt.Publish("topic/refund", 1, false, refundKey)
+			tokenR.Wait()
+
+			utils.RefundChannels = append(utils.RefundChannels, utils.RefundItem{Id: newId.ID(), RefundChannel: make(chan string)})
+
+			var index int
+			for i := range utils.RefundChannels {
+				x := len(utils.RefundChannels) - i - 1
+				if utils.RefundChannels[x].Id == newId.ID() {
+					index = x
+					break
+				}
+			}
+
+			resultRefund := <-utils.RefundChannels[index].RefundChannel
+
+			fmt.Printf("Refund: %s\n", resultRefund)
+
+			if resultRefund == "error" {
+				return c.SendStatus(500)
+			} else {
+				return c.SendStatus(404)
+			}
+		}
 
 		if resultStock == "error" || resultPayment == "error" {
 			return c.SendStatus(404)

@@ -28,8 +28,14 @@ type CheckoutItem struct {
 	StockChannel   chan string
 }
 
+type RefundItem struct {
+	Id            uint32
+	RefundChannel chan string
+}
+
 var ItemChannels []ItemChannel
 var CheckoutChannels []CheckoutItem
+var RefundChannels []RefundItem
 
 func OpenMqttConnection() mqtt.Client {
 	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
@@ -99,10 +105,11 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		var index int
 		var payload string
 		var orderId int
-		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-%s", &orderId, &payload)
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-id:%d-%s", &orderId, &id, &payload)
 		for i := range CheckoutChannels {
 			x := len(CheckoutChannels) - i - 1
-			if CheckoutChannels[x].OrderId == orderId {
+			if CheckoutChannels[x].Id == id {
 				index = x
 				break
 			}
@@ -114,6 +121,25 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 				CheckoutChannels[index].PaymentChannel <- "success"
 			}
 		}(CheckoutChannels[index].PaymentChannel)
+	case msg.Topic() == "topic/refundResponse":
+		var index int
+		var payload string
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "id:%d-%s", &id, &payload)
+		for i := range RefundChannels {
+			x := len(RefundChannels) - i - 1
+			if RefundChannels[x].Id == id {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				RefundChannels[index].RefundChannel <- "error"
+			} else {
+				RefundChannels[index].RefundChannel <- "success"
+			}
+		}(RefundChannels[index].RefundChannel)
 	default:
 	}
 

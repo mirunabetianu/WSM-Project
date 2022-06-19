@@ -182,33 +182,25 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	id := uint32(body["id"][0])
 
 	orderId := itemIds[len(itemIds)-1]
-	fmt.Println(itemIds)
-
-	fmt.Println(orderId)
 
 	itemIds = itemIds[:len(itemIds)-1]
-	fmt.Println(itemIds)
 
 	dict := make(map[int64]uint)
 	for _, num := range itemIds {
 		dict[num] = dict[num] + 1
 	}
 
-	var item utils.Item
-
 	var notEnoughStock bool
 	notEnoughStock = false
 
 	for index, value := range dict {
-
+		var item utils.Item
 		resultItem := database.Find(&item, index)
 
-		if resultItem.Error != nil || item.Stock-uint(value) < 0 {
+		if resultItem.Error != nil || int(item.Stock)-int(value) < 0 {
 			notEnoughStock = true
 		}
 	}
-
-	fmt.Println(notEnoughStock)
 
 	if err != nil || notEnoughStock {
 		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
@@ -218,6 +210,8 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 		var anyError bool
 		anyError = false
 		for index, value := range dict {
+			var item utils.Item
+
 			resultItem := database.Find(&item, index).Update("Stock", item.Stock-value)
 
 			if resultItem.Error != nil {

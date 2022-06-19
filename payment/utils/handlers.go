@@ -173,7 +173,7 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 	var user User
 	responseUser := Database.Find(&user, userId)
 
-	notEnoughCredit := user.Credit-(uint(totalCost)) < 0
+	notEnoughCredit := (int)(user.Credit)-totalCost < 0
 
 	println(err != nil)
 	println(responseUser.Error != nil)
@@ -185,7 +185,7 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 	} else {
 		var payment Payment
 		resultPayment := Database.Where(Payment{OrderID: uint(orderId)}).First(&payment)
-		responseUpdate := Database.Find(&user, userId).Updates(User{Credit: user.Credit - (uint(totalCost))})
+		responseUpdate := Database.Find(&user, userId).Updates(User{Credit: uint((int)(user.Credit) - totalCost)})
 
 		if responseUpdate.Error != nil || resultPayment.Error == nil {
 			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
@@ -206,5 +206,31 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 			}
 		}
 
+	}
+}
+
+func RefundAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
+	var userId string
+	var totalCost int
+	var id uint32
+	_, err := fmt.Sscanf(string(msg.Payload()), "amount:%d-id:%d-userId:%s", &totalCost, &id, &userId)
+
+	if err != nil {
+		payload := fmt.Sprintf("id:%d-%s", id, "error")
+		token := mqttC.Publish("topic/refundResponse", 1, false, payload)
+		token.Wait()
+	} else {
+		var user User
+		result := Database.Find(&user, userId).Update("Credit", user.Credit+uint(totalCost))
+
+		if result.RowsAffected == 0 {
+			payload := fmt.Sprintf("id:%d-%s", id, "error")
+			token := mqttC.Publish("topic/refundResponse", 1, false, payload)
+			token.Wait()
+		} else {
+			payload := fmt.Sprintf("id:%d-%s", id, "success")
+			token := mqttC.Publish("topic/refundResponse", 1, false, payload)
+			token.Wait()
+		}
 	}
 }
