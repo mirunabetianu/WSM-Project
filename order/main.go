@@ -140,7 +140,15 @@ func findOrder(c *fiber.Ctx) error {
 		return c.SendStatus(404)
 	}
 
-	return c.Status(200).JSON(&order)
+	/*
+		“order_id”  - the order’s id
+		“paid” (true/false)
+		“items”  - list of item ids that are included in the order
+		“user_id”  - the user’s id that made the order
+		“total_cost” - the total cost of the items in the order
+	*/
+
+	return c.Status(200).JSON(fiber.Map{"order_id": order.ID, "paid": order.Paid, "items": order.Items, "user_id": order.UserId, "total_cost": order.TotalCost})
 }
 
 func addItemToOrder(c *fiber.Ctx) error {
