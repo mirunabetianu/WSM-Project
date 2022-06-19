@@ -182,7 +182,10 @@ func addItemToOrder(c *fiber.Ctx) error {
 		}
 	}
 
-	itemPrice := <-utils.ItemChannels[index].Channel
+	var itemPrice int
+	go func(chan int) {
+		itemPrice = <-utils.ItemChannels[index].Channel
+	}(utils.ItemChannels[index].Channel)
 
 	if itemPrice == math.MaxInt {
 		return c.SendStatus(400)
@@ -236,9 +239,10 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 				break
 			}
 		}
-
-		itemPrice := <-utils.ItemChannels[index].Channel
-
+		var itemPrice int
+		go func(chan int) {
+			itemPrice = <-utils.ItemChannels[index].Channel
+		}(utils.ItemChannels[index].Channel)
 		if itemPrice == math.MaxInt {
 			return c.SendStatus(400)
 		} else {
@@ -266,6 +270,7 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 				return c.SendStatus(200)
 			}
 		}
+
 	} else {
 		return c.SendStatus(400)
 	}
@@ -301,14 +306,15 @@ func checkout(c *fiber.Ctx) error {
 				break
 			}
 		}
-
-		resultPayment := <-utils.CheckoutChannels[index].PaymentChannel
-		resultStock := <-utils.CheckoutChannels[index].StockChannel
+		var resultPayment, resultStock string
+		go func(chan string, chan string) {
+			resultPayment = <-utils.CheckoutChannels[index].PaymentChannel
+			resultStock = <-utils.CheckoutChannels[index].StockChannel
+		}(utils.CheckoutChannels[index].PaymentChannel, utils.CheckoutChannels[index].StockChannel)
 
 		fmt.Printf("Payment: %s \n Stock: %s \n", resultPayment, resultStock)
 
 		if resultStock != "error" && resultPayment == "error" {
-			fmt.Println("Suntt in cazul asta")
 			newId := uuid.New()
 
 			refundKey := fmt.Sprintf("amount:%d-id:%d-userId:%s", order.TotalCost, newId.ID(), order.UserId)
@@ -327,7 +333,10 @@ func checkout(c *fiber.Ctx) error {
 				}
 			}
 
-			resultRefund := <-utils.RefundChannels[index].RefundChannel
+			var resultRefund string
+			go func(chan string) {
+				resultRefund = <-utils.RefundChannels[index].RefundChannel
+			}(utils.RefundChannels[index].RefundChannel)
 
 			fmt.Printf("Refund: %s\n", resultRefund)
 

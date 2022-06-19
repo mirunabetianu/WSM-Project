@@ -21,9 +21,6 @@ func FindUser(c *fiber.Ctx) error {
 }
 
 func CreateUser(c *fiber.Ctx) error {
-	type Item struct {
-		User_id uint `json:"user_id"`
-	}
 	user := &User{Credit: 0}
 	result := Database.Create(user)
 	if result.Error != nil {
