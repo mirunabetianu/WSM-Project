@@ -12,8 +12,8 @@ var (
 	host     = "localhost"
 	port     = 5432
 	user     = "postgres"
-	password = "Miruna999"
-	dbname   = "wsm"
+	password = "root"
+	dbname   = "postgres"
 )
 
 type Item struct {
