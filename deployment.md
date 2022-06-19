@@ -1,4 +1,10 @@
-### Setup the cluster locally
+### Setup the postgres locally
+```bash
+kubectl apply -f k8s/postgres-config.yaml
+kubectl apply -f k8s/postgres.yaml
+```
+
+### Setup the services
 ```bash
 kubectl apply -f k8s
 ```
