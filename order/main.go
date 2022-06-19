@@ -307,45 +307,51 @@ func checkout(c *fiber.Ctx) error {
 			}
 		}
 		var resultPayment, resultStock string
-		go func(chan string, chan string) {
+		go func(chan string) {
 			resultPayment = <-utils.CheckoutChannels[index].PaymentChannel
-			resultStock = <-utils.CheckoutChannels[index].StockChannel
-		}(utils.CheckoutChannels[index].PaymentChannel, utils.CheckoutChannels[index].StockChannel)
+		}(utils.CheckoutChannels[index].PaymentChannel)
 
 		fmt.Printf("Payment: %s \n Stock: %s \n", resultPayment, resultStock)
 
-		if resultStock != "error" && resultPayment == "error" {
-			newId := uuid.New()
-
-			refundKey := fmt.Sprintf("amount:%d-id:%d-userId:%s", order.TotalCost, newId.ID(), order.UserId)
-
-			tokenR := mqtt.Publish("topic/refund", 1, false, refundKey)
-			tokenR.Wait()
-
-			utils.RefundChannels = append(utils.RefundChannels, utils.RefundItem{Id: newId.ID(), RefundChannel: make(chan string)})
-
-			var index int
-			for i := range utils.RefundChannels {
-				x := len(utils.RefundChannels) - i - 1
-				if utils.RefundChannels[x].Id == newId.ID() {
-					index = x
-					break
-				}
-			}
-
-			var resultRefund string
-			go func(chan string) {
-				resultRefund = <-utils.RefundChannels[index].RefundChannel
-			}(utils.RefundChannels[index].RefundChannel)
-
-			fmt.Printf("Refund: %s\n", resultRefund)
-
-			if resultRefund == "error" {
-				return c.SendStatus(500)
-			} else {
-				return c.SendStatus(404)
-			}
+		if resultPayment == "error" {
+			return c.SendStatus(404)
 		}
+		go func(chan string) {
+			resultStock = <-utils.CheckoutChannels[index].StockChannel
+		}(utils.CheckoutChannels[index].StockChannel)
+
+		//if resultStock != "error" && resultPayment == "error" {
+		//	newId := uuid.New()
+		//
+		//	refundKey := fmt.Sprintf("amount:%d-id:%d-userId:%s", order.TotalCost, newId.ID(), order.UserId)
+		//
+		//	tokenR := mqtt.Publish("topic/refund", 1, false, refundKey)
+		//	tokenR.Wait()
+		//
+		//	utils.RefundChannels = append(utils.RefundChannels, utils.RefundItem{Id: newId.ID(), RefundChannel: make(chan string)})
+		//
+		//	var index int
+		//	for i := range utils.RefundChannels {
+		//		x := len(utils.RefundChannels) - i - 1
+		//		if utils.RefundChannels[x].Id == newId.ID() {
+		//			index = x
+		//			break
+		//		}
+		//	}
+		//
+		//	var resultRefund string
+		//	go func(chan string) {
+		//		resultRefund = <-utils.RefundChannels[index].RefundChannel
+		//	}(utils.RefundChannels[index].RefundChannel)
+		//
+		//	fmt.Printf("Refund: %s\n", resultRefund)
+		//
+		//	if resultRefund == "error" {
+		//		return c.SendStatus(500)
+		//	} else {
+		//		return c.SendStatus(404)
+		//	}
+		//}
 
 		if resultStock == "error" || resultPayment == "error" {
 			return c.SendStatus(404)
