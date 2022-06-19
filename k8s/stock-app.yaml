@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: stock-service
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     component: stock
   ports:
-    - port: 5000
+    - port: 5001
       name: http
       targetPort: 3001
 ---
