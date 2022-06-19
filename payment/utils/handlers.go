@@ -172,16 +172,13 @@ func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
 
 	notEnoughCredit := (int)(user.Credit)-totalCost < 0
 
-	println(err != nil)
-	println(responseUser.Error != nil)
-	println(notEnoughCredit)
 	if err != nil || responseUser.Error != nil || notEnoughCredit {
 		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 		token.Wait()
 	} else {
 		var payment Payment
-		resultPayment := Database.Where(Payment{OrderID: uint(orderId)}).First(&payment)
+		resultPayment := Database.Where(Payment{OrderID: uint(orderId)}).Last(&payment)
 		responseUpdate := Database.Find(&user, userId).Updates(User{Credit: uint((int)(user.Credit) - totalCost)})
 
 		if responseUpdate.Error != nil || resultPayment.Error == nil {
