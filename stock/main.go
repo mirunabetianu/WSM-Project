@@ -129,8 +129,9 @@ func addStockToItem(ctx *fiber.Ctx) error {
 
 func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 	var orderId, itemId int
+	var id string
 
-	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d", &orderId, &itemId)
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-id:%s", &orderId, &itemId, &id)
 
 	var item utils.Item
 	result := database.Find(&item, itemId)
@@ -142,7 +143,7 @@ func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 		status = 200
 	}
 
-	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d", orderId, itemId, item.Price, status)
+	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d-id:%s", orderId, itemId, item.Price, status, id)
 
 	print(finalResult)
 	token := mqttC.Publish("topic/findItemResponse", 1, false, finalResult)
@@ -155,6 +156,9 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	err := json.Unmarshal(msg.Payload(), &body)
 
 	itemIds := body["items"]
+	id := uint32(body["id"][0])
+	fmt.Println("ID")
+	fmt.Println(id)
 
 	orderId := itemIds[len(itemIds)-1]
 	fmt.Println(itemIds)
@@ -186,7 +190,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	fmt.Println(notEnoughStock)
 
 	if err != nil || notEnoughStock {
-		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 		token.Wait()
 	} else {
@@ -202,11 +206,11 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 		}
 
 		if anyError {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 			token.Wait()
 		} else {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "success")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 			token.Wait()
 		}

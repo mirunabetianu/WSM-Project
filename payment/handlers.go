@@ -175,9 +175,10 @@ func paymentStatus(c *fiber.Ctx) error {
 func SubtractAmountLocal(client mqtt.Client, msg mqtt.Message) {
 	var orderId, totalCost int
 	var userId string
+	var id uint32
 
 	print(string(msg.Payload()))
-	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-userId:%s", &orderId, &totalCost, &userId)
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-id:%d-userId:%s", &orderId, &totalCost, &id, &userId)
 
 	var user utils.User
 	responseUser := utils.Database.Find(&user, userId)
@@ -188,7 +189,7 @@ func SubtractAmountLocal(client mqtt.Client, msg mqtt.Message) {
 	println(responseUser.Error != nil)
 	println(notEnoughCredit)
 	if err != nil || responseUser.Error != nil || notEnoughCredit {
-		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 		token.Wait()
 	} else {
@@ -197,7 +198,7 @@ func SubtractAmountLocal(client mqtt.Client, msg mqtt.Message) {
 		responseUpdate := utils.Database.Find(&user, userId).Updates(utils.User{Credit: user.Credit - (uint(totalCost))})
 
 		if responseUpdate.Error != nil || resultPayment.Error == nil {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 			token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 			token.Wait()
 		} else {
@@ -205,11 +206,11 @@ func SubtractAmountLocal(client mqtt.Client, msg mqtt.Message) {
 			resultCreatePayment := utils.Database.Create(&payment)
 
 			if resultCreatePayment.Error != nil {
-				payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+				payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 				token.Wait()
 			} else {
-				payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+				payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "success")
 				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
 				token.Wait()
 			}

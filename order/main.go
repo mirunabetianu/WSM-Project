@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"math"
 	utils "order/utils"
 	"strconv"
@@ -135,15 +136,19 @@ func addItemToOrder(c *fiber.Ctx) error {
 		return c.SendStatus(400)
 	}
 
-	channelKey := fmt.Sprintf("orderId:%d-itemId:%d", orderId, itemId)
+	id := uuid.New()
+
+	channelKey := fmt.Sprintf("orderId:%d-itemId:%d-id:%s", orderId, itemId, id.String())
 
 	token := mqtt.Publish("topic/findItem", 1, false, channelKey)
 	token.Wait()
 
-	utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+	utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{Id: id.String(), OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
 	index := len(utils.ItemChannels) - 1
 
 	itemPrice := <-utils.ItemChannels[index].Channel
+
+	print(itemPrice)
 
 	if itemPrice == math.MaxInt {
 		return c.SendStatus(400)
@@ -182,12 +187,14 @@ func removeItemFromOrder(c *fiber.Ctx) error {
 			return c.SendStatus(400)
 		}
 
-		channelKey := fmt.Sprintf("orderId:%d-itemId:%d", orderId, itemId)
+		id := uuid.New()
+
+		channelKey := fmt.Sprintf("orderId:%d-itemId:%d-id:%s", orderId, itemId, id.String())
 
 		token := mqtt.Publish("topic/findItem", 1, false, channelKey)
 		token.Wait()
 
-		utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
+		utils.ItemChannels = append(utils.ItemChannels, utils.ItemChannel{Id: id.String(), OrderId: orderId, ItemId: itemId, Channel: make(chan int)})
 		index := len(utils.ItemChannels) - 1
 
 		itemPrice := <-utils.ItemChannels[index].Channel
@@ -230,23 +237,24 @@ func checkout(c *fiber.Ctx) error {
 	var order utils.Order
 	result := database.Find(&order, order_id)
 
+	id := uuid.New()
+
 	orderId, errConversionO := strconv.Atoi(order_id)
-	items, err := json.Marshal(map[string][]int64{"items": append(order.Items, int64(orderId))})
+	items, err := json.Marshal(map[string][]int64{"items": append(order.Items, int64(orderId)), "id": {int64((id.ID()))}})
 
 	if order.Items == nil || err != nil || errConversionO != nil {
 		return c.SendStatus(400)
 	}
 	if result.RowsAffected == 1 {
-		channelKey := fmt.Sprintf("orderId:%d-amount:%d-userId:%s", orderId, order.TotalCost, order.UserId)
+		channelKey := fmt.Sprintf("orderId:%d-amount:%d-id:%d-userId:%s", orderId, order.TotalCost, id.ID(), order.UserId)
 		token := mqtt.Publish("topic/payment", 1, false, channelKey)
 		token.Wait()
 
 		tokenN := mqtt.Publish("topic/subtractStock", 1, false, items)
 		tokenN.Wait()
-		utils.CheckoutChannels = append(utils.CheckoutChannels, utils.CheckoutItem{OrderId: orderId, PaymentChannel: make(chan string), StockChannel: make(chan string)})
-		index := len(utils.CheckoutChannels) - 1
 
-		print(index)
+		utils.CheckoutChannels = append(utils.CheckoutChannels, utils.CheckoutItem{Id: id.ID(), OrderId: orderId, PaymentChannel: make(chan string), StockChannel: make(chan string)})
+		index := len(utils.CheckoutChannels) - 1
 
 		resultPayment := <-utils.CheckoutChannels[index].PaymentChannel
 		resultStock := <-utils.CheckoutChannels[index].StockChannel

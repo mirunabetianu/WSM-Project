@@ -13,12 +13,14 @@ var mqttUsername = "order_service"
 var mqttPassword = "public"
 
 type ItemChannel struct {
+	Id      string
 	OrderId int
 	ItemId  int
 	Channel chan int
 }
 
 type CheckoutItem struct {
+	Id             uint32
 	OrderId        int
 	PaymentChannel chan string
 	StockChannel   chan string
@@ -50,11 +52,12 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 	switch {
 	case msg.Topic() == "topic/findItemResponse":
 		var itemId, itemPrice, status, orderId int
-		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d", &orderId, &itemId, &itemPrice, &status)
+		var id string
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d-id:%s", &orderId, &itemId, &itemPrice, &status, &id)
 		var index int
 		for i := range ItemChannels {
 			x := len(ItemChannels) - i - 1
-			if ItemChannels[x].OrderId == orderId && ItemChannels[x].ItemId == itemId {
+			if ItemChannels[x].Id == id {
 				index = x
 				break
 			}
@@ -70,11 +73,11 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		var index int
 		var payload string
 		var orderId int
-		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-%s", &orderId, &payload)
-
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-id:%d-%s", &orderId, &id, &payload)
 		for i := range CheckoutChannels {
 			x := len(CheckoutChannels) - i - 1
-			if CheckoutChannels[x].OrderId == orderId {
+			if CheckoutChannels[x].Id == id {
 				index = x
 				break
 			}
