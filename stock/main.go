@@ -153,7 +153,9 @@ func addStockToItem(ctx *fiber.Ctx) error {
 func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 	var orderId, itemId int
 
-	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d", &orderId, &itemId)
+	var id string
+
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-id:%s", &orderId, &itemId, &id)
 
 	var item utils.Item
 	result := database.Find(&item, itemId)
@@ -165,9 +167,8 @@ func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 		status = 200
 	}
 
-	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d", orderId, itemId, item.Price, status)
+	finalResult := fmt.Sprintf("orderId:%d-itemId:%d-price:%d-status:%d-id:%s", orderId, itemId, item.Price, status, id)
 
-	print(finalResult)
 	token := mqttC.Publish("topic/findItemResponse", 1, false, finalResult)
 	token.Wait()
 }
@@ -178,6 +179,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	err := json.Unmarshal(msg.Payload(), &body)
 
 	itemIds := body["items"]
+	id := uint32(body["id"][0])
 
 	orderId := itemIds[len(itemIds)-1]
 	fmt.Println(itemIds)
@@ -187,7 +189,7 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	itemIds = itemIds[:len(itemIds)-1]
 	fmt.Println(itemIds)
 
-	dict := make(map[int64]int)
+	dict := make(map[int64]uint)
 	for _, num := range itemIds {
 		dict[num] = dict[num] + 1
 	}
@@ -209,15 +211,14 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 	fmt.Println(notEnoughStock)
 
 	if err != nil || notEnoughStock {
-		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 		token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 		token.Wait()
 	} else {
 		var anyError bool
 		anyError = false
 		for index, value := range dict {
-
-			resultItem := database.Find(&item, index).Update("Stock", item.Stock-uint(value))
+			resultItem := database.Find(&item, index).Update("Stock", item.Stock-value)
 
 			if resultItem.Error != nil {
 				anyError = true
@@ -225,11 +226,11 @@ func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
 		}
 
 		if anyError {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "error")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 			token.Wait()
 		} else {
-			payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+			payload := fmt.Sprintf("orderId:%d-id:%d-%s", orderId, id, "success")
 			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
 			token.Wait()
 		}
