@@ -20,7 +20,14 @@ type ItemChannel struct {
 	Channel chan int
 }
 
-var Chans []ItemChannel
+type CheckoutItem struct {
+	OrderId        int
+	PaymentChannel chan string
+	StockChannel   chan string
+}
+
+var ItemChannels []ItemChannel
+var CheckoutChannels []CheckoutItem
 
 func OpenMqttConnection() mqtt.Client {
 	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
@@ -50,20 +57,59 @@ var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Me
 		var itemId, itemPrice, status, orderId int
 		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d", &orderId, &itemId, &itemPrice, &status)
 		var index int
-		for i := range Chans {
-			x := len(Chans) - i - 1
-			if Chans[x].OrderId == orderId && Chans[x].ItemId == itemId {
+		for i := range ItemChannels {
+			x := len(ItemChannels) - i - 1
+			if ItemChannels[x].OrderId == orderId && ItemChannels[x].ItemId == itemId {
 				index = x
 				break
 			}
 		}
 		go func(chan int) {
 			if err != nil || status == 500 {
-				Chans[index].Channel <- math.MaxInt
+				ItemChannels[index].Channel <- math.MaxInt
 			} else {
-				Chans[index].Channel <- itemPrice
+				ItemChannels[index].Channel <- itemPrice
 			}
-		}(Chans[index].Channel)
+		}(ItemChannels[index].Channel)
+	case msg.Topic() == "topic/subtractStockResponse":
+		var index int
+		var payload string
+		var orderId int
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-%s", &orderId, &payload)
+
+		for i := range CheckoutChannels {
+			x := len(CheckoutChannels) - i - 1
+			if CheckoutChannels[x].OrderId == orderId {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				CheckoutChannels[index].StockChannel <- "error"
+			} else {
+				CheckoutChannels[index].StockChannel <- "success"
+			}
+		}(CheckoutChannels[index].StockChannel)
+	case msg.Topic() == "topic/paymentResponse":
+		var index int
+		var payload string
+		var orderId int
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-%s", &orderId, &payload)
+		for i := range CheckoutChannels {
+			x := len(CheckoutChannels) - i - 1
+			if CheckoutChannels[x].OrderId == orderId {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				CheckoutChannels[index].PaymentChannel <- "error"
+			} else {
+				CheckoutChannels[index].PaymentChannel <- "success"
+			}
+		}(CheckoutChannels[index].PaymentChannel)
 	default:
 	}
 

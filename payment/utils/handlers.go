@@ -2,26 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"strconv"
-
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
+	"strconv"
 )
-
-type User struct {
-	gorm.Model
-	Credit uint
-}
-
-type Payment struct {
-	gorm.Model
-	Status  byte
-	OrderID uint
-}
-
-func BaseEndpoint(c *fiber.Ctx) error {
-	return c.Status(200).JSON(fiber.Map{"status": "running"})
-}
 
 func FindUser(c *fiber.Ctx) error {
 	type Item struct {
@@ -184,4 +168,50 @@ func PaymentStatus(c *fiber.Ctx) error {
 	}
 
 	return c.Status(200).JSON(fiber.Map{"paid": paid})
+}
+
+func SubtractAmountLocal(mqttC mqtt.Client, msg mqtt.Message) {
+	var orderId, totalCost int
+	var userId string
+
+	print(string(msg.Payload()))
+	_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-amount:%d-userId:%s", &orderId, &totalCost, &userId)
+
+	var user User
+	responseUser := Database.Find(&user, userId)
+
+	notEnoughCredit := user.Credit-(uint(totalCost)) < 0
+
+	println(err != nil)
+	println(responseUser.Error != nil)
+	println(notEnoughCredit)
+	if err != nil || responseUser.Error != nil || notEnoughCredit {
+		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+		token.Wait()
+	} else {
+		var payment Payment
+		resultPayment := Database.Where(Payment{OrderID: uint(orderId)}).First(&payment)
+		responseUpdate := Database.Find(&user, userId).Updates(User{Credit: user.Credit - (uint(totalCost))})
+
+		if responseUpdate.Error != nil || resultPayment.Error == nil {
+			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+			token.Wait()
+		} else {
+			payment = Payment{Status: 0, OrderID: uint(orderId)}
+			resultCreatePayment := Database.Create(&payment)
+
+			if resultCreatePayment.Error != nil {
+				payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+				token.Wait()
+			} else {
+				payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+				token := mqttC.Publish("topic/paymentResponse", 1, false, payload)
+				token.Wait()
+			}
+		}
+
+	}
 }

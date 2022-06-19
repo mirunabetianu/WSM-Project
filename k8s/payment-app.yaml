@@ -28,7 +28,7 @@ spec:
       containers:
         - name: payment
           # The image needs to be built and pushed to online registry
-          image: farsene/payment
+          image: farsene/payment-mqtt
           command: [ "/bin/sh", "-c", "go run main.go" ]
           env:
             - name: POSTGRES_DB

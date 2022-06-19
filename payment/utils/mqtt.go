@@ -9,15 +9,14 @@ import (
 var id = uuid.New()
 var mqttBroker = "localhost"
 var mqttPort = 1883
-var mqttClientId = "stock_service_id" + id.String()
-var mqttUsername = "stock_service" + id.String()
+var mqttClientId = "payment_service_id" + id.String()
+var mqttUsername = "payment_service" + id.String()
 var mqttPassword = "public"
 
 func OpenMqttConnection() mqtt.Client {
 	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
 		mqttBroker = GetEnv("EMQX_BROKER_SERVICE_HOST")
 	}
-
 	// init required options
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", mqttBroker, mqttPort))
@@ -46,5 +45,5 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 }
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("Connect lost: %v", err)
+	fmt.Printf("OpenPsqlConnection lost: %v", err)
 }

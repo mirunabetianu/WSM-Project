@@ -24,6 +24,9 @@ func main() {
 
 	token := mqttC.Subscribe("topic/findItem", 1, FindItemLocal)
 	token.Wait()
+
+	tokenC := mqttC.Subscribe("topic/subtractStock", 1, SubtractStockLocal)
+	tokenC.Wait()
 	fmt.Printf("Subscribed to topic: %s", "topic/addItem")
 
 	fmt.Printf("Trying to publish to: %s", "topic/addItem")
@@ -167,4 +170,69 @@ func FindItemLocal(client mqtt.Client, msg mqtt.Message) {
 	print(finalResult)
 	token := mqttC.Publish("topic/findItemResponse", 1, false, finalResult)
 	token.Wait()
+}
+
+func SubtractStockLocal(client mqtt.Client, msg mqtt.Message) {
+	var body map[string][]int64
+
+	err := json.Unmarshal(msg.Payload(), &body)
+
+	itemIds := body["items"]
+
+	orderId := itemIds[len(itemIds)-1]
+	fmt.Println(itemIds)
+
+	fmt.Println(orderId)
+
+	itemIds = itemIds[:len(itemIds)-1]
+	fmt.Println(itemIds)
+
+	dict := make(map[int64]int)
+	for _, num := range itemIds {
+		dict[num] = dict[num] + 1
+	}
+
+	var item utils.Item
+
+	var notEnoughStock bool
+	notEnoughStock = false
+
+	for index, value := range dict {
+
+		resultItem := database.Find(&item, index)
+
+		if resultItem.Error != nil || item.Stock-uint(value) < 0 {
+			notEnoughStock = true
+		}
+	}
+
+	fmt.Println(notEnoughStock)
+
+	if err != nil || notEnoughStock {
+		payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+		token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
+		token.Wait()
+	} else {
+		var anyError bool
+		anyError = false
+		for index, value := range dict {
+
+			resultItem := database.Find(&item, index).Update("Stock", item.Stock-uint(value))
+
+			if resultItem.Error != nil {
+				anyError = true
+			}
+		}
+
+		if anyError {
+			payload := fmt.Sprintf("orderId:%d-%s", orderId, "error")
+			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
+			token.Wait()
+		} else {
+			payload := fmt.Sprintf("orderId:%d-%s", orderId, "success")
+			token := mqttC.Publish("topic/subtractStockResponse", 1, false, payload)
+			token.Wait()
+		}
+	}
+
 }
