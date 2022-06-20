@@ -5,8 +5,10 @@ go 1.18
 require (
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/gofiber/fiber/v2 v2.34.0
+	github.com/google/uuid v1.3.0
 	gorm.io/driver/postgres v1.3.7
 	gorm.io/gorm v1.23.5
+	github.com/google/uuid v1.3.0
 )
 
 require (

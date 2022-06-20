@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: order-service
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     component: order
   ports:
@@ -28,7 +28,7 @@ spec:
       containers:
         - name: order
           # The image needs to be built and pushed to online registry
-          image: farsene/order
+          image: farsene/order-mqtt
           command: [ "/bin/sh", "-c", "go run main.go" ]
           env:
             - name: POSTGRES_DB

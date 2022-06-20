@@ -1,27 +1,28 @@
 # Web Scale Management Project
 
-### Current state
+Here you can find the instructions on how to deploy the k8s cluster locally and how to access each endpoint
 
-In the project's root directory, the _main.go_ file establishes a simple connection to a Postgress database. Don't forget to fill in your credentials.
+### Local K8s deployment
 
-Sample implementation of an endpoint: **coming soon!**
-
-### Task implementation
-
-Create a new branch for any added feature/fix and use pull requests. 
-
-### TODO
-
-- [ ] Implement order microservices (endpoints + db)
-- [ ] Implement payment microservices (endpoints + db)
-- [ ] Implement stock microservices (endpoints + db)
-- [ ] Setup event based communication between services
-- [ ] Local deployment
-- [ ] Cloud deployment
-
-### Docker commands
+#### Setup the postgres locally (1)
 ```bash
-docker build -t payment/Dockerfile payment .
-docker build -f stock/Dockerfile -t stock .
-docker build -f order/Dockerfile -t order .
+kubectl apply -f k8s/postgres-config.yaml
+kubectl apply -f k8s/postgres.yaml
 ```
+
+#### Setup the services (2)
+```bash
+kubectl apply -f k8s
+```
+
+#### Forward ports to each service (3) - run each command in a different terminal window
+```bash
+kubectl port-forward service/order-service 5000
+kubectl port-forward service/stock-service 5001
+kubectl port-forward service/payment-service 5002
+```
+#### Endpoints after port forwarding (4)
+
+Order service is accessible at http://localhost:5000/orders
+Stock service is accessible at http://localhost:5001/stock
+Payment service is accessible at http://localhost:5002/payment

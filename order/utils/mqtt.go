@@ -3,19 +3,44 @@ package utils
 import (
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"time"
+	"github.com/google/uuid"
+	"math"
 )
 
+var id = uuid.New()
 var mqttBroker = "localhost"
 var mqttPort = 1883
-var mqttClientId = "order_service_id"
-var mqttUsername = "order_service"
+var mqttClientId = "order_service_id" + id.String()
+var mqttUsername = "order_service" + id.String()
 var mqttPassword = "public"
 
-var TOPIC_ADD_ITEM = "topic/addItem"
-var TOPIC_REMOVE_ITEM = "topic/removeItem"
+type ItemChannel struct {
+	Id      string
+	OrderId int
+	ItemId  int
+	Channel chan int
+}
+
+type CheckoutItem struct {
+	Id             uint32
+	OrderId        int
+	PaymentChannel chan string
+	StockChannel   chan string
+}
+
+type RefundItem struct {
+	Id            uint32
+	RefundChannel chan string
+}
+
+var ItemChannels []ItemChannel
+var CheckoutChannels []CheckoutItem
+var RefundChannels []RefundItem
 
 func OpenMqttConnection() mqtt.Client {
+	if GetEnv("EMQX_BROKER_SERVICE_HOST") != "" {
+		mqttBroker = GetEnv("EMQX_BROKER_SERVICE_HOST")
+	}
 	// init required options
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", mqttBroker, mqttPort))
@@ -35,12 +60,89 @@ func OpenMqttConnection() mqtt.Client {
 }
 
 var messagePubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-	if msg.Topic() == TOPIC_ADD_ITEM {
+	switch {
+	case msg.Topic() == "topic/findItemResponse":
+		var itemId, itemPrice, status, orderId int
+		var id string
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-itemId:%d-price:%d-status:%d-id:%s", &orderId, &itemId, &itemPrice, &status, &id)
+		var index int
+		for i := range ItemChannels {
+			x := len(ItemChannels) - i - 1
+			if ItemChannels[x].Id == id {
+				index = x
+				break
+			}
+		}
+		go func(chan int) {
+			if err != nil || status == 500 {
+				ItemChannels[index].Channel <- math.MaxInt
+			} else {
+				ItemChannels[index].Channel <- itemPrice
+			}
+		}(ItemChannels[index].Channel)
+	case msg.Topic() == "topic/subtractStockResponse":
+		var index int
+		var payload string
+		var orderId int
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-id:%d-%s", &orderId, &id, &payload)
 
-	} else if msg.Topic() == TOPIC_REMOVE_ITEM {
-
+		for i := range CheckoutChannels {
+			x := len(CheckoutChannels) - i - 1
+			if CheckoutChannels[x].Id == id {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				CheckoutChannels[index].StockChannel <- "error"
+			} else {
+				CheckoutChannels[index].StockChannel <- "success"
+			}
+		}(CheckoutChannels[index].StockChannel)
+	case msg.Topic() == "topic/paymentResponse":
+		var index int
+		var payload string
+		var orderId int
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "orderId:%d-id:%d-%s", &orderId, &id, &payload)
+		for i := range CheckoutChannels {
+			x := len(CheckoutChannels) - i - 1
+			if CheckoutChannels[x].Id == id {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				CheckoutChannels[index].PaymentChannel <- "error"
+			} else {
+				CheckoutChannels[index].PaymentChannel <- "success"
+			}
+		}(CheckoutChannels[index].PaymentChannel)
+	case msg.Topic() == "topic/refundResponse":
+		var index int
+		var payload string
+		var id uint32
+		_, err := fmt.Sscanf(string(msg.Payload()), "id:%d-%s", &id, &payload)
+		for i := range RefundChannels {
+			x := len(RefundChannels) - i - 1
+			if RefundChannels[x].Id == id {
+				index = x
+				break
+			}
+		}
+		go func(chan string) {
+			if payload == "error" || err != nil {
+				RefundChannels[index].RefundChannel <- "error"
+			} else {
+				RefundChannels[index].RefundChannel <- "success"
+			}
+		}(RefundChannels[index].RefundChannel)
+	default:
 	}
+
 }
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
@@ -49,20 +151,4 @@ var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
 	fmt.Printf("Connect lost: %v", err)
-}
-
-func Publish(client mqtt.Client, topic string) {
-	num := 100
-	for i := 0; i < num; i++ {
-		text := fmt.Sprintf("Message %d de la %s", i, mqttUsername)
-		token := client.Publish(topic, 0, false, text)
-		token.Wait()
-		time.Sleep(time.Second)
-	}
-}
-
-func Subscribe(client mqtt.Client, topic string) {
-	token := client.Subscribe(topic, 1, nil)
-	token.Wait()
-	fmt.Printf("Subscribed to topic: %s", topic)
 }
